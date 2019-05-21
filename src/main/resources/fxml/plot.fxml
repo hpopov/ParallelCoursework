@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.StackPane?>
+
+<StackPane fx:id="rootPane" fx:controller="ua.kpi.iasa.parallel.course.PlotController"
+        xmlns:fx="http://javafx.com/fxml">
+</StackPane>

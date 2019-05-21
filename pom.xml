@@ -15,12 +15,20 @@
         <name>soloHPopov</name>
     </organization>
 
+		<repositories>
+		  <repository>
+		     <id>jzy3d-releases</id>
+		     <name>Jzy3d Releases</name>
+		     <url>http://maven.jzy3d.org/releases</url>
+		  </repository>
+		</repositories>
     <properties>
 	     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	     <maven.compiler.source>1.8</maven.compiler.source>
 	     <maven.compiler.target>1.8</maven.compiler.target>
         <slf4j.version>1.7.12</slf4j.version>
         <log4j.version>1.2.17</log4j.version>
+        <jzy3d.version>1.0.2</jzy3d.version>
     </properties>
 
     <build>
@@ -111,7 +119,18 @@
             <artifactId>log4j</artifactId>
             <version>${log4j.version}</version>
         </dependency>
-
+			<dependency>
+			    <groupId>org.jzy3d</groupId>
+			    <artifactId>jzy3d-api</artifactId>
+			    <version>${jzy3d.version}</version>
+			</dependency>
+			<!-- https://mvnrepository.com/artifact/org.jzy3d/jzy3d-javafx -->
+			<dependency>
+			    <groupId>org.jzy3d</groupId>
+			    <artifactId>jzy3d-javafx</artifactId>
+			    <version>${jzy3d.version}</version>
+			</dependency>
+						
     </dependencies>
 
 </project>
