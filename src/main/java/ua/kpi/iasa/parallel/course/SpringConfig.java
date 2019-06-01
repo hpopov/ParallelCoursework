@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
 import javafx.fxml.FXMLLoader;
+import ua.kpi.iasa.parallel.course.plot.PlotController;
 
 @Configuration
 @ComponentScan("ua.kpi.iasa.parallel.course")
@@ -18,5 +19,4 @@ public class SpringConfig {
 	public InputStream conditionImageResource() {
 		return getClass().getResourceAsStream("/images/condition.png");
 	}
-
 }

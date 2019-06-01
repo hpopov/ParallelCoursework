@@ -16,6 +16,7 @@ import org.jzy3d.plot3d.builder.concrete.OrthonormalGrid;
 import org.jzy3d.plot3d.builder.concrete.OrthonormalTessellator;
 import org.jzy3d.plot3d.primitives.Shape;
 import org.jzy3d.plot3d.rendering.canvas.Quality;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Controller;
 
 import javafx.fxml.FXML;
@@ -25,6 +26,7 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 
 @Controller
+@Scope("prototype")
 public class PlotController{
 	private final JavaFXChartFactory chartFactory;
 	private AWTChart chart;
