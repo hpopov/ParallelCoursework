@@ -2,7 +2,13 @@
 
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
 
-<StackPane fx:id="rootPane" fx:controller="ua.kpi.iasa.parallel.course.PlotController"
-        xmlns:fx="http://javafx.com/fxml">
-</StackPane>
+<VBox fx:controller="ua.kpi.iasa.parallel.course.plot.PlotController"
+		xmlns:fx="http://javafx.com/fxml"
+		alignment="CENTER">
+	<Label fx:id="name">Some graphic!</Label>
+	<StackPane fx:id="graphicPane" >
+	</StackPane>
+</VBox>

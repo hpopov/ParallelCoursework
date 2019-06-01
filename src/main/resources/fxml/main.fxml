@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.chart.BubbleChart?>
+<?import ua.kpi.iasa.parallel.course.main.EquationService?>
+
+<VBox fx:controller="ua.kpi.iasa.parallel.course.main.MainController"
+		xmlns:fx="http://javafx.com/fxml"
+		alignment="CENTER">
+	<HBox alignment="CENTER">
+	<ImageView fx:id="conditionImage"></ImageView>
+	<Label>; A=0, B=0, alpha = 1</Label>
+	</HBox>
+	
+	<HBox alignment="CENTER_LEFT">
+		<Label>x∈[</Label>
+		<TextField fx:id="xMin">0</TextField>
+		<Label> ; </Label>
+		<TextField fx:id="xMax">10</TextField>
+		<Label>] </Label>
+		<Label>steps: </Label>
+		<TextField fx:id="xSteps">10</TextField>
+	</HBox>
+	<HBox alignment="CENTER_LEFT">
+		<Label>t∈[</Label>
+		<TextField fx:id="tMin">0</TextField>
+		<Label> ; </Label>
+		<TextField fx:id="tMax">10</TextField>
+		<Label>] </Label>
+		<Label>steps: </Label>
+		<TextField fx:id="tSteps">10</TextField>
+	</HBox>
+	
+	<HBox>
+		<CheckBox fx:id="parallelCalculationEnabled">parallel calculation?</CheckBox>
+		<ComboBox fx:id="calculationMethod"></ComboBox>
+		<Button fx:id="buildSolutionButton">Build</Button>
+	</HBox>
+	
+	<Button fx:id="showPreciseSolutionButton"
+			onAction="#showPreciseSolution">Show precise solution</Button>
+	<Button fx:id="showBuiltSolutionButton">Show built solution</Button>
+	<Button fx:id="showDifferenceButton">Show the difference</Button>
+</VBox>

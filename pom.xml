@@ -29,6 +29,7 @@
         <slf4j.version>1.7.12</slf4j.version>
         <log4j.version>1.2.17</log4j.version>
         <jzy3d.version>1.0.2</jzy3d.version>
+		<org.springframework.version>5.1.7.RELEASE</org.springframework.version>
     </properties>
 
     <build>
@@ -80,14 +81,11 @@
 
 
     <dependencies>
-    
-        <!-- MigLayout -->
-
-        <dependency>
-            <groupId>com.miglayout</groupId>
-            <artifactId>miglayout-javafx</artifactId>
-            <version>5.0</version>
-        </dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>${org.springframework.version}</version>
+		</dependency>
 
         <!-- Apache Commons -->
 
