@@ -5,10 +5,6 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.Label?>
 
-<VBox fx:controller="ua.kpi.iasa.parallel.course.plot.PlotController"
-		xmlns:fx="http://javafx.com/fxml"
-		alignment="CENTER">
-	<Label fx:id="name">Some graphic!</Label>
-	<StackPane fx:id="graphicPane" >
-	</StackPane>
-</VBox>
+<StackPane fx:controller="ua.kpi.iasa.parallel.course.plot.PlotController" xmlns:fx="http://javafx.com/fxml"
+	fx:id="graphicPane">
+</StackPane>

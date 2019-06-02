@@ -16,9 +16,12 @@ import org.jzy3d.plot3d.builder.concrete.OrthonormalGrid;
 import org.jzy3d.plot3d.builder.concrete.OrthonormalTessellator;
 import org.jzy3d.plot3d.primitives.Shape;
 import org.jzy3d.plot3d.rendering.canvas.Quality;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Controller;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -29,14 +32,19 @@ import javafx.scene.layout.StackPane;
 @Scope("prototype")
 public class PlotController{
 	private final JavaFXChartFactory chartFactory;
-	private AWTChart chart;
+	private final BooleanProperty isWireframeDisplayedProperty;
+	private final AWTChart chart;
 	
 	@FXML private StackPane graphicPane;
-	@FXML private Label name;
+//	@FXML private Label name;
+	
+//	private PlotParametersService plotParametersService;
 
-	public PlotController() {
+	@Autowired
+	public PlotController(final PlotParametersService plotParametersService) {
 		chartFactory = new JavaFXChartFactory();
-		
+//		this.plotParametersService = plotParametersService;
+		isWireframeDisplayedProperty = plotParametersService.isWireframeDisplayedProperty();
 		chart = makeChart();
 	}
 
@@ -50,40 +58,42 @@ public class PlotController{
 		return chart;
 	}
 	
-	public void addSurfaceFromPoint(final List<Coord3d> points) {
+	public void addSurfaceFromPoints(final List<Coord3d> points) {
 		OrthonormalTessellator tesselator = new OrthonormalTessellator();
 		final Shape surface = (Shape) tesselator.build(points);
+		setupSurface(surface);
+		chart.getScene().getGraph().add(surface);
+	}
+
+	private void setupSurface(final Shape surface) {
 		surface.setColorMapper(new ColorMapper(new ColorMapRainbow(),
 				surface.getBounds().getZmin(), surface.getBounds().getZmax(),
 				new Color(1, 1, 1, 1.f)));
 		surface.setFaceDisplayed(true);
 		surface.setWireframeColor(Color.BLACK);
-		surface.setWireframeDisplayed(true);
-		
-		chart.getScene().getGraph().add(surface);
+		surface.setWireframeDisplayed(isWireframeDisplayedProperty.get());
+//		s/
+		isWireframeDisplayedProperty.addListener(
+				(observable, oldV, newV)-> surface.setWireframeDisplayed(newV));
 	}
 	
 	public void addSurfaceFromFunction(final OrthonormalGrid grid,
 			final DoubleBinaryOperator function) {
 		Mapper mapper = new FunctionMapper(function);
 		final Shape surface = Builder.buildOrthonormal(grid, mapper);
-		surface.setColorMapper(new ColorMapper(new ColorMapRainbow(),
-				surface.getBounds().getZmin(), surface.getBounds().getZmax(),
-				new Color(1, 1, 1, 1.f)));
-		surface.setFaceDisplayed(true);
-		surface.setWireframeColor(Color.BLACK);
-		surface.setWireframeDisplayed(true);
+		setupSurface(surface);
 		
 		chart.getScene().getGraph().add(surface);
 	}
 	
 	public void addSceneSizeChangedListener(Scene scene) {
 		chartFactory.addSceneSizeChangedListener(chart, scene);
+//		chartFactory.ad
 	}
 	
-	public void setName(String name) {
-		this.name.setText(name);
-	}
+//	public void setName(String name) {
+//		this.name.setText(name);
+//	}
 	
 	public void initializeContent() {
 		ImageView imageView = chartFactory.bindImageView(chart);

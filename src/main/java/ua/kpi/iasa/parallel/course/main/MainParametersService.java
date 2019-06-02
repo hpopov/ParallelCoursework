@@ -1,7 +1,5 @@
 package ua.kpi.iasa.parallel.course.main;
 
-import java.util.function.DoubleBinaryOperator;
-
 import org.jzy3d.maths.Range;
 import org.jzy3d.plot3d.builder.concrete.OrthonormalGrid;
 import org.springframework.stereotype.Service;
@@ -12,7 +10,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 
 @Service
-public class MainParamtersService {
+public class MainParametersService {
 	private final DoubleProperty xMinProperty;
 	private final DoubleProperty xMaxProperty;
 	private final IntegerProperty xStepsProperty;
@@ -21,7 +19,7 @@ public class MainParamtersService {
 	private final IntegerProperty tStepsProperty;
 	
 	
-	public MainParamtersService() {
+	public MainParametersService() {
 		xMinProperty = new SimpleDoubleProperty(-10);
 		xMaxProperty = new SimpleDoubleProperty(10);
 		xStepsProperty = new SimpleIntegerProperty(20);
@@ -55,11 +53,32 @@ public class MainParamtersService {
 	}
 	
 	public OrthonormalGrid getOrthonormalGrid() {
-		Range xrange = new Range((float)xMinProperty.get(), (float)xMaxProperty.get());
-		int xsteps = xStepsProperty.get();
-		Range trange = new Range((float)tMinProperty.get(), (float)tMaxProperty.get());
-		int tsteps = tStepsProperty.get();
+		Range xrange = getXRange();
+		int xsteps = getXSteps();
+		Range trange = getTRange();
+		int tsteps = getTSteps();
 		return new OrthonormalGrid(xrange, xsteps, trange, tsteps);
 	}
+
+	public Range getXRange() {
+		return new Range((float)xMinProperty.get(), (float)xMaxProperty.get());
+	}
+	
+	public Range getTRange() {
+		return new Range((float)tMinProperty.get(), (float)tMaxProperty.get());
+	}
+
+	public int getXSteps() {
+		return xStepsProperty.get();
+	}
+
+	public int getTSteps() {
+		return tStepsProperty.get();
+	}
+
+	public void setTSteps(int tSteps) {
+		tStepsProperty.set(tSteps);
+	}
+
 		
 }

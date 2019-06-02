@@ -3,8 +3,10 @@ package ua.kpi.iasa.parallel.course.main;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.util.List;
 import java.util.ResourceBundle;
 
+import org.jzy3d.maths.Coord3d;
 import org.jzy3d.plot3d.builder.concrete.OrthonormalGrid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,8 +33,8 @@ import javafx.util.Callback;
 import javafx.util.converter.NumberStringConverter;
 import ua.kpi.iasa.parallel.course.MainApp;
 import ua.kpi.iasa.parallel.course.main.methods.DiffeqCalculationMethod;
-import ua.kpi.iasa.parallel.course.main.methods.impl.ExplicitDiffeqCalculationMethod;
 import ua.kpi.iasa.parallel.course.plot.PlotController;
+import ua.kpi.iasa.parallel.course.plot.PlotParametersService;
 
 @Controller
 public class MainController implements Initializable{
@@ -54,20 +56,25 @@ public class MainController implements Initializable{
 	@FXML private Button showPreciseSolutionButton;
 	@FXML private Button showBuiltSolutionButton;
 	@FXML private Button showDifferenceButton;
+	
+	@FXML private CheckBox isWireframeDisplayed;
 
 	@Autowired
-	private MainParamtersService mainParametersService;
+	private MainParametersService mainParametersService;
 	
 	@Autowired
 	private PreciseSolutionService preciseSolutionService;
 
 	@Autowired
+	private PlotParametersService plotParametersService;
+
+	@Autowired
 	@Qualifier("conditionImageResource")
 	private InputStream conditionImageResource;
 
-	public MainController() {
-		//		conditionImageResource = MainController.class.getResourceAsStream("/images/condition.png");
-	}
+	@Autowired
+	@Qualifier("diffeqCalculationMethods")
+	private List<DiffeqCalculationMethod> diffeqCalculationMethods;
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
@@ -87,10 +94,8 @@ public class MainController implements Initializable{
 		tSteps.textProperty().bindBidirectional(mainParametersService.tStepsProperty(),
 				new NumberStringConverter());
 		
-
 		Callback<ListView<DiffeqCalculationMethod>, ListCell<DiffeqCalculationMethod>>
-		calculationMethodDescFactory =  param-> {
-				return new ListCell<DiffeqCalculationMethod>() {
+		calculationMethodDescFactory =  param-> new ListCell<DiffeqCalculationMethod>() {
 					
 					@Override
 					protected void updateItem(DiffeqCalculationMethod item, boolean empty) {
@@ -103,27 +108,27 @@ public class MainController implements Initializable{
 					}
 				};
 
-		};
 		calculationMethod.setCellFactory(calculationMethodDescFactory);
 //		calculationMethod.valueProperty().addListener((observable, prev, curr)-> {
 //			tSteps.setDisable(!curr.allowManualTSptepsResizing());
 //		});
-		calculationMethod.getItems().add(new ExplicitDiffeqCalculationMethod());
+		calculationMethod.getItems().addAll(diffeqCalculationMethods);
+		if (diffeqCalculationMethods.size() > 0) {
+			calculationMethod.setValue(diffeqCalculationMethods.get(0));
+		}
+		
+		plotParametersService.isWireframeDisplayedProperty()
+			.bindBidirectional(isWireframeDisplayed.selectedProperty());
 	}
 
-	public void showPreciseSolution(Event e) {
+	@FXML
+	private void showPreciseSolution(Event e) {
 		OrthonormalGrid grid = mainParametersService.getOrthonormalGrid();
 		log.info("Showing precise solution in grid {}", grid);
 		String fxmlFile = "/fxml/plot.fxml";
 		log.debug("Loading FXML for plot view from: {}", fxmlFile);
 		FXMLLoader loader = MainApp.makeFxmlLoader();
-		Parent rootNode = null;
-		try {
-			rootNode = loader.load(MainApp.class.getResourceAsStream(fxmlFile));
-		} catch (IOException ex) {
-			log.error("Unable to load view from {}. Operation will be aborted.", fxmlFile);
-			return;
-		}
+		Parent rootNode = loadRootNode(fxmlFile, loader);
 		log.debug("Showing JFX scene");
 		Scene scene = new Scene(rootNode, 500, 530);
 		scene.getStylesheets().add("/styles/styles.css"); 
@@ -131,11 +136,59 @@ public class MainController implements Initializable{
 		PlotController plotController = loader.getController();
 		plotController.addSurfaceFromFunction(grid, preciseSolutionService.getPreciseSolutionFunction());
 		plotController.addSceneSizeChangedListener(scene);
-		plotController.setName("Precise solution");
 		plotController.initializeContent();
+		showNewStage(scene, "Precise solution");
+	}
+
+	private Parent loadRootNode(String fxmlFile, FXMLLoader loader) {
+		Parent rootNode = null;
+		try {
+			rootNode = loader.load(MainApp.class.getResourceAsStream(fxmlFile));
+		} catch (IOException ex) {
+			throw new RuntimeException(
+					String.format("Unable to load view from %s. Operation will be aborted.", fxmlFile));
+		}
+		return rootNode;
+	}
+
+	private void showNewStage(Scene scene, String title) {
 		Stage stage = new Stage();
-		stage.setTitle("Parallel calculation coursework presentation");
+		stage.setTitle(title);
 		stage.setScene(scene);
 		stage.show();
+	}
+	
+	@FXML
+	private void showBuiltSolution(Event e) {
+		OrthonormalGrid grid = mainParametersService.getOrthonormalGrid();
+		log.info("Showing built solution in grid {}", grid);
+		String fxmlFile = "/fxml/plot.fxml";
+		log.debug("Loading FXML for plot view from: {}", fxmlFile);
+		FXMLLoader loader = MainApp.makeFxmlLoader();
+		Parent rootNode = loadRootNode(fxmlFile, loader);
+		log.debug("Showing JFX scene");
+		Scene scene = new Scene(rootNode, 500, 530);
+		scene.getStylesheets().add("/styles/styles.css");
+
+		PlotController plotController = loader.getController();
+		List<Coord3d> points = calculationMethod.getValue()
+				.solveDiffEquation(mainParametersService.getXRange(), mainParametersService.getTRange(),
+						mainParametersService.getXSteps(), mainParametersService.getTSteps());
+		plotController.addSurfaceFromPoints(points );
+		plotController.addSceneSizeChangedListener(scene);
+		plotController.initializeContent();
+		showNewStage(scene, "Built solution");
+	}
+	
+	@FXML
+	private void findTStepsToBeConvergent(Event e) {
+		xSteps.setDisable(true);
+		tSteps.setDisable(true);
+		int suitableTSteps = calculationMethod.getValue().findSuitableTSteps(mainParametersService.getXRange(),
+				mainParametersService.getTRange(), mainParametersService.getXSteps(),
+				mainParametersService.getTSteps());
+		mainParametersService.setTSteps(suitableTSteps);
+		xSteps.setDisable(false);
+		tSteps.setDisable(false);
 	}
 }
