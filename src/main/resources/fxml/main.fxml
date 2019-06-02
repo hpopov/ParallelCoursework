@@ -10,6 +10,8 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.chart.BubbleChart?>
 <?import javafx.scene.control.SelectionModel?>
+<?import ua.com.kl.cmathtutor.fxcommons.scene.control.NumberTextField?>
+<?import ua.com.kl.cmathtutor.fxcommons.scene.control.IntegerTextField?>
 
 <VBox fx:controller="ua.kpi.iasa.parallel.course.main.MainController"
 		xmlns:fx="http://javafx.com/fxml"
@@ -17,29 +19,29 @@
 	<HBox alignment="CENTER">
 	<ImageView fx:id="conditionImage"></ImageView>
 	<Label> ; A=</Label>
-	<TextField fx:id="aValue" prefWidth="45">0</TextField>
+	<NumberTextField  fx:id="aValue" prefWidth="45">0</NumberTextField>
 	<Label> , B=</Label>
-	<TextField fx:id="bValue" prefWidth="45">0</TextField>
+	<NumberTextField fx:id="bValue" prefWidth="45">0</NumberTextField>
 	<Label> , alpha = 1</Label>
 	</HBox>
 	
 	<HBox alignment="CENTER_LEFT">
 		<Label>x∈[</Label>
-		<TextField fx:id="xMin">0</TextField>
+		<NumberTextField fx:id="xMin">0</NumberTextField>
 		<Label> ; </Label>
-		<TextField fx:id="xMax">10</TextField>
+		<NumberTextField fx:id="xMax">10</NumberTextField>
 		<Label>] </Label>
 		<Label>steps: </Label>
-		<TextField fx:id="xSteps">10</TextField>
+		<IntegerTextField fx:id="xSteps">10</IntegerTextField>
 	</HBox>
 	<HBox alignment="CENTER_LEFT">
 		<Label>t∈[</Label>
-		<TextField fx:id="tMin">0</TextField>
+		<NumberTextField fx:id="tMin">0</NumberTextField>
 		<Label> ; </Label>
-		<TextField fx:id="tMax">10</TextField>
+		<NumberTextField fx:id="tMax">10</NumberTextField>
 		<Label>] </Label>
 		<Label>steps: </Label>
-		<TextField fx:id="tSteps">10</TextField>
+		<IntegerTextField fx:id="tSteps">10</IntegerTextField>
 		<Button onAction="#findTStepsToBeConvergent">Find steps to be convergent</Button>
 	</HBox>
 	
