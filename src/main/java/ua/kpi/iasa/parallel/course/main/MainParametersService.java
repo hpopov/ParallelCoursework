@@ -17,15 +17,20 @@ public class MainParametersService {
 	private final DoubleProperty tMinProperty;
 	private final DoubleProperty tMaxProperty;
 	private final IntegerProperty tStepsProperty;
+	private final double alpha = 1;
 	
 	
 	public MainParametersService() {
 		xMinProperty = new SimpleDoubleProperty(-10);
 		xMaxProperty = new SimpleDoubleProperty(10);
-		xStepsProperty = new SimpleIntegerProperty(20);
+		xStepsProperty = new SimpleIntegerProperty(10);
 		tMinProperty = new SimpleDoubleProperty(-10);
-		tMaxProperty = new SimpleDoubleProperty(10);
-		tStepsProperty = new SimpleIntegerProperty(20);
+		tMaxProperty = new SimpleDoubleProperty(-2);
+		tStepsProperty = new SimpleIntegerProperty(10);
+	}
+	
+	public double getAlpha() {
+		return alpha;
 	}
 	
 	public DoubleProperty xMinProperty() {

@@ -3,7 +3,6 @@ package ua.kpi.iasa.parallel.course.main;
 import static java.lang.Math.pow;
 
 import java.util.function.DoubleBinaryOperator;
-import java.util.function.DoubleFunction;
 import java.util.function.DoubleUnaryOperator;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +16,9 @@ public class PreciseSolutionService {
 	
 	private final DoubleProperty aProperty;
 	private final DoubleProperty bProperty;
-	private final double alpha = 1;
+	
+	@Autowired
+	private MainParametersService mainParametersService;
 
 	public PreciseSolutionService() {
 		aProperty = new SimpleDoubleProperty(0);
@@ -27,7 +28,8 @@ public class PreciseSolutionService {
 	public DoubleBinaryOperator getPreciseSolutionFunction() {
 		final double A = aProperty.get();
 		final double B = bProperty.get();
-		return (x,t)-> pow(pow((x-A), 2)/(8*alpha*(B-t)),1.5);
+		final double alpha = mainParametersService.getAlpha();
+		return (x,t)-> pow(pow((x-A), 2)/(8*alpha *(B-t)),1.5);
 	}
 	
 	public DoubleUnaryOperator getTimeLevelFunction(double t) {
@@ -46,9 +48,5 @@ public class PreciseSolutionService {
 	
 	public DoubleProperty bProperty() {
 		return bProperty;
-	}
-	
-	public double getAlpha() {
-		return alpha;
 	}
 }

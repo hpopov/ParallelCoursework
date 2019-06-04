@@ -71,7 +71,7 @@ public class MainController implements Initializable{
 	@Autowired
 	@Qualifier("conditionImageResource")
 	private InputStream conditionImageResource;
-
+	
 	@Autowired
 	@Qualifier("diffeqCalculationMethods")
 	private List<DiffeqCalculationMethod> diffeqCalculationMethods;
@@ -123,6 +123,12 @@ public class MainController implements Initializable{
 
 	@FXML
 	private void showPreciseSolution(Event e) {
+		if (mainParametersService.getXSteps() < 2) {
+			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+		}
+		if (mainParametersService.getTSteps() < 2) {
+			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+		}
 		OrthonormalGrid grid = mainParametersService.getOrthonormalGrid();
 		log.info("Showing precise solution in grid {}", grid);
 		String fxmlFile = "/fxml/plot.fxml";
@@ -160,6 +166,14 @@ public class MainController implements Initializable{
 	
 	@FXML
 	private void showBuiltSolution(Event e) {
+		final int xSteps = mainParametersService.getXSteps();
+		final int tSteps = mainParametersService.getTSteps();
+		if (xSteps < 2) {
+			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+		}
+		if (tSteps < 2) {
+			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+		}
 		OrthonormalGrid grid = mainParametersService.getOrthonormalGrid();
 		log.info("Showing built solution in grid {}", grid);
 		String fxmlFile = "/fxml/plot.fxml";
@@ -171,10 +185,15 @@ public class MainController implements Initializable{
 		scene.getStylesheets().add("/styles/styles.css");
 
 		PlotController plotController = loader.getController();
-		List<Coord3d> points = calculationMethod.getValue()
-				.solveDiffEquation(mainParametersService.getXRange(), mainParametersService.getTRange(),
-						mainParametersService.getXSteps(), mainParametersService.getTSteps());
-		plotController.addSurfaceFromPoints(points );
+		DiffeqCalculationMethod method = calculationMethod.getValue();
+		List<Coord3d> points = null;
+		points = parallelCalculationEnabled.isSelected()
+				? method.solveDiffEquationConcurrently(mainParametersService.getXRange(),
+						mainParametersService.getTRange(), xSteps, tSteps)
+				: method.solveDiffEquation(mainParametersService.getXRange(),
+						mainParametersService.getTRange(), xSteps, tSteps);
+				System.out.println(points);
+		plotController.addSurfaceFromPoints(points);
 		plotController.addSceneSizeChangedListener(scene);
 		plotController.initializeContent();
 		showNewStage(scene, "Built solution");
