@@ -6,6 +6,7 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.security.Key;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -25,6 +26,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Controller;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.event.Event;
@@ -120,9 +123,9 @@ public class MainController implements Initializable{
 		image = new Image(preciseSolutionImageResource);
 		preciseSolutionImage.setImage(image);
 		aValue.textProperty()
-		.bindBidirectional(preciseSolutionService.aProperty(), new NumberStringConverter());
+			.bindBidirectional(preciseSolutionService.aProperty(), new NumberStringConverter());
 		bValue.textProperty()
-		.bindBidirectional(preciseSolutionService.bProperty(), new NumberStringConverter());
+			.bindBidirectional(preciseSolutionService.bProperty(), new NumberStringConverter());
 
 		xMin.textProperty().bindBidirectional(mainParametersService.xMinProperty(), new NumberStringConverter());
 		xMax.textProperty().bindBidirectional(mainParametersService.xMaxProperty(), new NumberStringConverter());
@@ -146,11 +149,7 @@ public class MainController implements Initializable{
 				}
 			}
 		};
-
 		calculationMethod.setCellFactory(calculationMethodDescFactory);
-		//		calculationMethod.valueProperty().addListener((observable, prev, curr)-> {
-		//			tSteps.setDisable(!curr.allowManualTSptepsResizing());
-		//		});
 		calculationMethod.getItems().addAll(diffeqCalculationMethods);
 		if (diffeqCalculationMethods.size() > 0) {
 			calculationMethod.setValue(diffeqCalculationMethods.get(0));
@@ -162,19 +161,15 @@ public class MainController implements Initializable{
 
 	@FXML
 	private void buildSolution(Event event) {
+		setParametersEditingDisabled(true);
+		setBuildButtonsDisabled(true);
 		final int xSteps = mainParametersService.getXSteps();
 		final int tSteps = mainParametersService.getTSteps();
 		final Range xRange = mainParametersService.getXRange();
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Building solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Building solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
+		if (validateSteps(xSteps, tSteps, "Building solution") == false) {
+			setParametersEditingDisabled(false);
 			return;
 		}
 
@@ -184,11 +179,50 @@ public class MainController implements Initializable{
 		key.setTSteps(tSteps);
 		key.setXRange(xRange);
 		key.setXSteps(xSteps);
+		setParametersEditingDisabled(false);
 		Task<UniformGrid> task = buildPlotPointsTask(key, method);
 		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> onBuildTaskSucceed(e, key));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_CANCELLED, e-> setBuildButtonsDisabled(false));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_FAILED, e-> setBuildButtonsDisabled(false));
 		buildProgressIndicator.setVisible(true);
 		new Thread(task).start();
 
+	}
+
+	private void setParametersEditingDisabled(boolean disabled) {
+		aValue.setDisable(disabled);
+		bValue.setDisable(disabled);
+		calculationMethod.setDisable(disabled);
+		parallelCalculationEnabled.setDisable(disabled);
+		tMax.setDisable(disabled);
+		tMin.setDisable(disabled);
+		tSteps.setDisable(disabled);
+		xMax.setDisable(disabled);
+		xMin.setDisable(disabled);
+		xSteps.setDisable(disabled);		
+	}
+
+	private void setBuildButtonsDisabled(boolean disabled) {
+		buildSolutionButton.setDisable(disabled);
+		//Also you should check, that, when in disabled state (building is in progress),
+		//any other attempt to build the solution will fail due to build process is already been running
+		//Maybe you should to add "abort" button so that 
+			//you will be able to stop the calculation without closing programm?
+		//And dont forget to add A and B to the cache key!
+	}
+
+	private boolean validateSteps(final int xSteps, final int tSteps, final String header) {
+		if (xSteps < 2) {
+			alert(AlertType.ERROR, header, "Invalid xSteps value",
+					"The number of xSteps should be at least 2!");
+			return false;
+		}
+		if (tSteps < 2) {
+			alert(AlertType.ERROR, header, "Invalid tSteps value",
+					"The number of tSteps should be at least 2!");
+			return false;
+		}
+		return true;
 	}
 
 	private Task<UniformGrid> buildPlotPointsTask(PlotCacheKey plotCacheKey, DiffeqCalculationMethod method) {
@@ -209,6 +243,7 @@ public class MainController implements Initializable{
 		List<Coord3d> points = ((UniformGrid) e.getSource().getValue()).getGridNodePoints();
 		plotDataCache.remove(plotCacheKey);
 		plotDataCache.put(plotCacheKey, new SoftReference<>(points));
+		setBuildButtonsDisabled(false);
 	}
 
 	@FXML
@@ -217,14 +252,7 @@ public class MainController implements Initializable{
 		final int xSteps = mainParametersService.getXSteps();
 		final Range tRange = mainParametersService.getTRange();
 		final int tSteps = mainParametersService.getTSteps();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting precise solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Presenting precise solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
+		if (validateSteps(xSteps, tSteps, "Presenting precise solution") == false) {
 			return;
 		}
 
@@ -275,14 +303,7 @@ public class MainController implements Initializable{
 		final Range xRange = mainParametersService.getXRange();
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting built solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Presenting built solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
+		if (validateSteps(xSteps, tSteps, "Presenting built solution") == false) {
 			return;
 		}
 
@@ -347,14 +368,7 @@ public class MainController implements Initializable{
 		final Range xRange = mainParametersService.getXRange();
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting difference between precise and built solutions", 
-					"Invalid xSteps value",	"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Presenting difference between precise and built solutions",
-					"Invalid tSteps value",	"The number of tSteps should be at least 2!");
+		if (validateSteps(xSteps, tSteps, "Presenting difference between precise and built solutions") == false) {
 			return;
 		}
 
