@@ -1,4 +1,4 @@
-package ua.kpi.iasa.parallel.course.main;
+package ua.kpi.iasa.parallel.course.services;
 
 import static java.lang.Math.pow;
 

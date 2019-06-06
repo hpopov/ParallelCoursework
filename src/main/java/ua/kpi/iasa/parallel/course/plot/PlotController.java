@@ -22,6 +22,7 @@ import org.springframework.stereotype.Controller;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -58,11 +59,19 @@ public class PlotController{
 		return chart;
 	}
 	
-	public void addSurfaceFromPoints(final List<Coord3d> points) {
-		OrthonormalTessellator tesselator = new OrthonormalTessellator();
-		final Shape surface = (Shape) tesselator.build(points);
-		setupSurface(surface);
-		chart.getScene().getGraph().add(surface);
+	public Task<Void> makeAddSurfaceFromPointsTask(final List<Coord3d> points) {
+		return new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				OrthonormalTessellator tesselator = new OrthonormalTessellator();
+				final Shape surface = (Shape) tesselator.build(points);
+				setupSurface(surface);
+				chart.getScene().getGraph().add(surface);
+				updateProgress(1, 1);
+				return null;
+			}
+		};
 	}
 
 	private void setupSurface(final Shape surface) {
@@ -77,13 +86,20 @@ public class PlotController{
 				(observable, oldV, newV)-> surface.setWireframeDisplayed(newV));
 	}
 	
-	public void addSurfaceFromFunction(final OrthonormalGrid grid,
+	public Task<Void> makeAddSurfaceFromFunctionTask(final OrthonormalGrid grid,
 			final DoubleBinaryOperator function) {
-		Mapper mapper = new FunctionMapper(function);
-		final Shape surface = Builder.buildOrthonormal(grid, mapper);
-		setupSurface(surface);
-		
-		chart.getScene().getGraph().add(surface);
+		return new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				Mapper mapper = new FunctionMapper(function);
+				final Shape surface = Builder.buildOrthonormal(grid, mapper);
+				setupSurface(surface);
+				chart.getScene().getGraph().add(surface);
+				updateProgress(1, 1);
+				return null;
+			}
+		};
 	}
 	
 	public void addSceneSizeChangedListener(Scene scene) {

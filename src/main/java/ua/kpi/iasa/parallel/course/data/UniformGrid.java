@@ -1,10 +1,6 @@
 package ua.kpi.iasa.parallel.course.data;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
 import org.jzy3d.maths.Coord3d;
 import org.jzy3d.maths.Range;
@@ -36,7 +32,7 @@ public class UniformGrid extends AbstractUniformGrid {
 		throw new IllegalStateException("Current grid has already had a pointer!");
 	}
 	
-	protected void addNodePoint(Coord3d point) {
+	private void addNodePoint(Coord3d point) {
 		nodePoints.add(point);
 	}
 	

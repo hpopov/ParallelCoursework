@@ -12,19 +12,19 @@
 <?import javafx.scene.control.SelectionModel?>
 <?import ua.com.kl.cmathtutor.fxcommons.scene.control.NumberTextField?>
 <?import ua.com.kl.cmathtutor.fxcommons.scene.control.IntegerTextField?>
+<?import javafx.scene.control.ProgressIndicator?>
 
-<VBox fx:controller="ua.kpi.iasa.parallel.course.main.MainController"
-		xmlns:fx="http://javafx.com/fxml"
-		alignment="CENTER">
+<VBox fx:controller="ua.kpi.iasa.parallel.course.MainController" 
+		xmlns:fx="http://javafx.com/fxml" alignment="CENTER">
 	<HBox alignment="CENTER">
-	<ImageView fx:id="conditionImage"></ImageView>
-	<Label> ; A=</Label>
-	<NumberTextField  fx:id="aValue" prefWidth="45">0</NumberTextField>
-	<Label> , B=</Label>
-	<NumberTextField fx:id="bValue" prefWidth="45">0</NumberTextField>
-	<Label> , alpha = 1</Label>
+		<ImageView fx:id="conditionImage"></ImageView>
+		<Label> ; A=</Label>
+		<NumberTextField fx:id="aValue" prefWidth="45">0</NumberTextField>
+		<Label> , B=</Label>
+		<NumberTextField fx:id="bValue" prefWidth="45">0</NumberTextField>
+		<Label> , alpha = 1</Label>
 	</HBox>
-	
+
 	<HBox alignment="CENTER_LEFT">
 		<Label>x∈[</Label>
 		<NumberTextField fx:id="xMin">0</NumberTextField>
@@ -42,22 +42,28 @@
 		<Label>] </Label>
 		<Label>steps: </Label>
 		<IntegerTextField fx:id="tSteps">10</IntegerTextField>
-		<Button onAction="#findTStepsToBeConvergent">Find steps to be convergent</Button>
 	</HBox>
-	
+
 	<HBox>
 		<CheckBox fx:id="parallelCalculationEnabled">parallel calculation?</CheckBox>
 		<ComboBox fx:id="calculationMethod">
 		</ComboBox>
-		<Button fx:id="buildSolutionButton">Build</Button>
+		<Button fx:id="buildSolutionButton" onAction="#buildSolution">Build</Button>
+		<ProgressIndicator fx:id="buildProgressIndicator" visible="false"></ProgressIndicator>
 	</HBox>
-	
-	<Button fx:id="showPreciseSolutionButton"
-			onAction="#showPreciseSolution">Show precise solution</Button>
-	<Button fx:id="showBuiltSolutionButton"
-			onAction="#showBuiltSolution">Show built solution</Button>
-	<Button fx:id="showDifferenceButton">Show the difference</Button>
-	
+
+	<HBox alignment="CENTER">
+		<VBox>
+			<Button fx:id="showPreciseSolutionButton" onAction="#showPreciseSolution">
+					Show precise solution</Button>
+			<Button fx:id="showBuiltSolutionButton" onAction="#showBuiltSolution">
+					Show built solution</Button>
+			<Button fx:id="showDifferenceButton" onAction="#showDifference">
+					Show the difference</Button>
+		</VBox>
+		<ProgressIndicator fx:id="showProgressIndicator" visible="false"></ProgressIndicator>
+	</HBox>
+
 	<HBox alignment="CENTER_LEFT">
 		<CheckBox fx:id="isWireframeDisplayed">Display plot wireframe</CheckBox>
 	</HBox>

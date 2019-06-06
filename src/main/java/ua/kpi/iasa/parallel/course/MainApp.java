@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -45,6 +46,7 @@ public class MainApp extends Application {
 //		MainController mainController = loader.getController();
 		stage.setTitle("Parallel calculation coursework presentation");
 		stage.setScene(scene);
+		stage.setOnCloseRequest(e-> Platform.exit());
 		stage.show();
 	}
 	

@@ -1,4 +1,4 @@
-package ua.kpi.iasa.parallel.course.main;
+package ua.kpi.iasa.parallel.course.services;
 
 import java.util.function.DoubleUnaryOperator;
 

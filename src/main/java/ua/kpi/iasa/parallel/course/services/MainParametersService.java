@@ -1,7 +1,6 @@
-package ua.kpi.iasa.parallel.course.main;
+package ua.kpi.iasa.parallel.course.services;
 
 import org.jzy3d.maths.Range;
-import org.jzy3d.plot3d.builder.concrete.OrthonormalGrid;
 import org.springframework.stereotype.Service;
 
 import javafx.beans.property.DoubleProperty;
@@ -55,14 +54,6 @@ public class MainParametersService {
 
 	public IntegerProperty tStepsProperty() {
 		return tStepsProperty;
-	}
-	
-	public OrthonormalGrid getOrthonormalGrid() {
-		Range xrange = getXRange();
-		int xsteps = getXSteps();
-		Range trange = getTRange();
-		int tsteps = getTSteps();
-		return new OrthonormalGrid(xrange, xsteps, trange, tsteps);
 	}
 
 	public Range getXRange() {

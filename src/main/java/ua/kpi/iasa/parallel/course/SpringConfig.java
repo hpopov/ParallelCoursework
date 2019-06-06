@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
-import ua.kpi.iasa.parallel.course.main.methods.DiffeqCalculationMethod;
-import ua.kpi.iasa.parallel.course.main.methods.impl.ExplicitDiffeqCalculationMethod;
+import ua.kpi.iasa.parallel.course.methods.DiffeqCalculationMethod;
+import ua.kpi.iasa.parallel.course.methods.impl.ExplicitDiffeqCalculationMethod;
 
 @Configuration
 @ComponentScan("ua.kpi.iasa.parallel.course")
