@@ -65,6 +65,7 @@ public class MainController implements Initializable{
 	private static final Logger log = LoggerFactory.getLogger(MainController.class);
 
 	@FXML private ImageView conditionImage;
+	@FXML private ImageView preciseSolutionImage;
 	@FXML private TextField aValue;
 	@FXML private TextField bValue;
 	@FXML private TextField xMin;
@@ -97,7 +98,11 @@ public class MainController implements Initializable{
 	@Autowired
 	@Qualifier("conditionImageResource")
 	private InputStream conditionImageResource;
-
+	
+	@Autowired
+	@Qualifier("preciseSolutionImageResource")
+	private InputStream preciseSolutionImageResource;
+	
 	@Autowired
 	@Qualifier("diffeqCalculationMethods")
 	private List<DiffeqCalculationMethod> diffeqCalculationMethods;
@@ -112,6 +117,8 @@ public class MainController implements Initializable{
 	public void initialize(URL arg0, ResourceBundle arg1) {
 		Image image = new Image(conditionImageResource);
 		conditionImage.setImage(image);
+		image = new Image(preciseSolutionImageResource);
+		preciseSolutionImage.setImage(image);
 		aValue.textProperty()
 		.bindBidirectional(preciseSolutionService.aProperty(), new NumberStringConverter());
 		bValue.textProperty()
@@ -161,10 +168,14 @@ public class MainController implements Initializable{
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
 		if (xSteps < 2) {
-			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+			alert(AlertType.ERROR, "Building solution", "Invalid xSteps value",
+					"The number of xSteps should be at least 2!");
+			return;
 		}
 		if (tSteps < 2) {
-			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+			alert(AlertType.ERROR, "Building solution", "Invalid tSteps value",
+					"The number of tSteps should be at least 2!");
+			return;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();
@@ -207,10 +218,14 @@ public class MainController implements Initializable{
 		final Range tRange = mainParametersService.getTRange();
 		final int tSteps = mainParametersService.getTSteps();
 		if (xSteps < 2) {
-			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting precise solution", "Invalid xSteps value",
+					"The number of xSteps should be at least 2!");
+			return;
 		}
 		if (tSteps < 2) {
-			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting precise solution", "Invalid tSteps value",
+					"The number of tSteps should be at least 2!");
+			return;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();
@@ -261,10 +276,14 @@ public class MainController implements Initializable{
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
 		if (xSteps < 2) {
-			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting built solution", "Invalid xSteps value",
+					"The number of xSteps should be at least 2!");
+			return;
 		}
 		if (tSteps < 2) {
-			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting built solution", "Invalid tSteps value",
+					"The number of tSteps should be at least 2!");
+			return;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();
@@ -329,10 +348,14 @@ public class MainController implements Initializable{
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
 		if (xSteps < 2) {
-			throw new IllegalArgumentException("The number of xSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting difference between precise and built solutions", 
+					"Invalid xSteps value",	"The number of xSteps should be at least 2!");
+			return;
 		}
 		if (tSteps < 2) {
-			throw new IllegalArgumentException("The number of tSteps should be at least 2!");
+			alert(AlertType.ERROR, "Presenting difference between precise and built solutions",
+					"Invalid tSteps value",	"The number of tSteps should be at least 2!");
+			return;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();

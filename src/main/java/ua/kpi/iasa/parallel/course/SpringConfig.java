@@ -23,6 +23,11 @@ public class SpringConfig {
 	public InputStream conditionImageResource() {
 		return getClass().getResourceAsStream("/images/condition.png");
 	}
+
+	@Bean("preciseSolutionImageResource")
+	public InputStream preciseSolutionImageResource() {
+		return getClass().getResourceAsStream("/images/precise_solution.png");
+	}
 	
 	@Bean("diffeqCalculationMethods")
 	public List<DiffeqCalculationMethod> diffeqCalculationMethods() {

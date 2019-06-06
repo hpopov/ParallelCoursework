@@ -18,11 +18,14 @@
 		xmlns:fx="http://javafx.com/fxml" alignment="CENTER">
 	<HBox alignment="CENTER">
 		<ImageView fx:id="conditionImage"></ImageView>
+		<Label> , &#945; = 1</Label>
+	</HBox>
+	<HBox alignment="CENTER">
+		<ImageView fx:id="preciseSolutionImage"></ImageView>
 		<Label> ; A=</Label>
 		<NumberTextField fx:id="aValue" prefWidth="45">0</NumberTextField>
 		<Label> , B=</Label>
 		<NumberTextField fx:id="bValue" prefWidth="45">0</NumberTextField>
-		<Label> , alpha = 1</Label>
 	</HBox>
 
 	<HBox alignment="CENTER_LEFT">

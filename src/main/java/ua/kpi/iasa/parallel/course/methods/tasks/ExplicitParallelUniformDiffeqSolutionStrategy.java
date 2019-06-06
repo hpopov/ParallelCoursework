@@ -233,6 +233,7 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 				@Override
 				protected Void call() throws Exception {
 					long totalWork = grid.getTStepsCount();
+					updateProgress(0, totalWork);
 					final GridValuePointer gridPointer = makeGridPointerFilledWithInitialCondidions(grid);
 					
 					long currentWork = 2;
