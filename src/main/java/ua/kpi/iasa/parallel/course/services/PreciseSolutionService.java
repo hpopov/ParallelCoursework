@@ -49,4 +49,12 @@ public class PreciseSolutionService {
 	public DoubleProperty bProperty() {
 		return bProperty;
 	}
+
+	public double getA() {
+		return aProperty.get();
+	}
+
+	public double getB() {
+		return bProperty.get();
+	}
 }
