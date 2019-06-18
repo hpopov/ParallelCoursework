@@ -10,6 +10,8 @@ public class PlotCacheKey {
 	private Range tRange;
 	private CalculationType calculationType;
 	private boolean isDifference;
+	private double paramA;
+	private double paramB;
 	
 	public PlotCacheKey() {
 		setDifference(false);
@@ -23,6 +25,8 @@ public class PlotCacheKey {
 		setTSteps(plotCacheKey.tSteps);
 		setXRange(plotCacheKey.xRange);
 		setXSteps(plotCacheKey.xSteps);
+		setParamA(plotCacheKey.paramA);
+		setParamB(plotCacheKey.paramB);
 	}
 
 	public int getXSteps() {
@@ -73,6 +77,22 @@ public class PlotCacheKey {
 		this.isDifference = isDifference;
 	}
 	
+	public double getParamA() {
+		return paramA;
+	}
+
+	public void setParamA(double paramA) {
+		this.paramA = paramA;
+	}
+
+	public double getParamB() {
+		return paramB;
+	}
+
+	public void setParamB(double paramB) {
+		this.paramB = paramB;
+	}
+	
 	@Override
 	public boolean equals(Object obj) {
 		if (obj == null || obj.hashCode() != hashCode()) {
@@ -82,7 +102,8 @@ public class PlotCacheKey {
 			return false;
 		}
 		PlotCacheKey other = (PlotCacheKey) obj;
-		return isDifference == other.isDifference && calculationType == other.calculationType 
+		return paramA == other.paramA && paramB == other.paramB
+				&& isDifference == other.isDifference && calculationType == other.calculationType
 				&& xSteps == other.xSteps && tSteps == other.tSteps
 				&& rangeEquals(xRange, other.xRange) && rangeEquals(tRange, other.tRange);
 	}
@@ -104,22 +125,19 @@ public class PlotCacheKey {
 		hash |= calculationType.hashCode();
 		hash <<= 1;
 		hash |= isDifference? 1 : 0;
+		hash <<= 2;
+		hash += paramA;
+		hash <<= 2;
+		hash += paramB;
 		return hash;
 	}
 	
 	@Override
 	public String toString() {
-		return String.format("{calculation type: %s, xRange: [%s,%s], tRange: [%s,%s],"
-				+ " xSteps:%s, tSteps:%s,"
-				+ (isDifference? "FOR DIFFERENCE":"") +"}", calculationType, xRange.getMin(), xRange.getMax(),
+		return String.format("{A: %s, B: %s, calculation type: %s, xRange: [%s,%s], tRange: [%s,%s],"
+				+ " xSteps:%s, tSteps:%s"
+				+ (isDifference? ", FOR DIFFERENCE":"") +"}", paramA, paramB,
+				calculationType, xRange.getMin(), xRange.getMax(),
 				tRange.getMin(), tRange.getMax(), xSteps, tSteps);
 	}
-	
-
-//	private int xSteps;
-//	private int tSteps;
-//	private Range xRange;
-//	private Range tRange;
-//	private CalculationType calculationType;
-//	private boolean isDifference;
 }

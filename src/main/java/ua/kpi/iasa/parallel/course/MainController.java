@@ -6,12 +6,14 @@ import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.net.URL;
 import java.security.Key;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.jzy3d.maths.Coord3d;
@@ -25,6 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Controller;
 
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.Task;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.event.Event;
@@ -49,6 +53,7 @@ import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
 import javafx.util.Callback;
 import javafx.util.converter.NumberStringConverter;
+import ua.com.kl.cmathtutor.commons.Pair;
 import ua.kpi.iasa.parallel.course.data.Coord3dComparator;
 import ua.kpi.iasa.parallel.course.data.UniformGrid;
 import ua.kpi.iasa.parallel.course.data.cache.CalculationType;
@@ -108,9 +113,11 @@ public class MainController implements Initializable{
 	private List<DiffeqCalculationMethod> diffeqCalculationMethods;
 
 	private final Map<PlotCacheKey, SoftReference<List<Coord3d>>> plotDataCache;
+	private final AtomicBoolean isBuildProcessRunning;
 
 	public MainController() {
 		plotDataCache = new HashMap<>();
+		isBuildProcessRunning = new AtomicBoolean(false);
 	}
 
 	@Override
@@ -120,9 +127,9 @@ public class MainController implements Initializable{
 		image = new Image(preciseSolutionImageResource);
 		preciseSolutionImage.setImage(image);
 		aValue.textProperty()
-		.bindBidirectional(preciseSolutionService.aProperty(), new NumberStringConverter());
+			.bindBidirectional(preciseSolutionService.aProperty(), new NumberStringConverter());
 		bValue.textProperty()
-		.bindBidirectional(preciseSolutionService.bProperty(), new NumberStringConverter());
+			.bindBidirectional(preciseSolutionService.bProperty(), new NumberStringConverter());
 
 		xMin.textProperty().bindBidirectional(mainParametersService.xMinProperty(), new NumberStringConverter());
 		xMax.textProperty().bindBidirectional(mainParametersService.xMaxProperty(), new NumberStringConverter());
@@ -146,11 +153,7 @@ public class MainController implements Initializable{
 				}
 			}
 		};
-
 		calculationMethod.setCellFactory(calculationMethodDescFactory);
-		//		calculationMethod.valueProperty().addListener((observable, prev, curr)-> {
-		//			tSteps.setDisable(!curr.allowManualTSptepsResizing());
-		//		});
 		calculationMethod.getItems().addAll(diffeqCalculationMethods);
 		if (diffeqCalculationMethods.size() > 0) {
 			calculationMethod.setValue(diffeqCalculationMethods.get(0));
@@ -162,20 +165,36 @@ public class MainController implements Initializable{
 
 	@FXML
 	private void buildSolution(Event event) {
+		Pair<PlotCacheKey, DiffeqCalculationMethod> keyAndMethod;
+		try {
+			keyAndMethod = getBuiltPlotCacheKeyAndCalculationMethod();
+		} catch (InvalidStepsException e) {
+			alert(AlertType.ERROR, "Building solution", e.getExceptionHeader(), e.getExceptionContent());
+			return;
+		}
+		if (!isBuildProcessRunning.compareAndSet(false, true)) {
+			alert(AlertType.WARNING, "Building solution", "Unable to launch building task",
+					"There is another running building task");
+			return;
+		}
+		Task<UniformGrid> task = buildPlotPointsTask(keyAndMethod.getFirst(), keyAndMethod.getSecond());
+		buildProgressIndicator.setVisible(true);
+		new Thread(task).start();
+	}
+	
+	private Pair<PlotCacheKey, DiffeqCalculationMethod> getBuiltPlotCacheKeyAndCalculationMethod()
+			throws InvalidStepsException {
+		setParametersEditingDisabled(true);
 		final int xSteps = mainParametersService.getXSteps();
 		final int tSteps = mainParametersService.getTSteps();
 		final Range xRange = mainParametersService.getXRange();
 		final Range tRange = mainParametersService.getTRange();
 		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Building solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Building solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
-			return;
+		try {
+			validateSteps(xSteps, tSteps);
+		} catch (InvalidStepsException e) {
+			setParametersEditingDisabled(false);
+			throw e;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();
@@ -184,14 +203,45 @@ public class MainController implements Initializable{
 		key.setTSteps(tSteps);
 		key.setXRange(xRange);
 		key.setXSteps(xSteps);
-		Task<UniformGrid> task = buildPlotPointsTask(key, method);
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> onBuildTaskSucceed(e, key));
-		buildProgressIndicator.setVisible(true);
-		new Thread(task).start();
+		key.setParamA(preciseSolutionService.getA());
+		key.setParamB(preciseSolutionService.getB());
+		setParametersEditingDisabled(false);
+		return new Pair<>(key, method);
+	}
 
+	private void setParametersEditingDisabled(boolean disabled) {
+		aValue.setDisable(disabled);
+		bValue.setDisable(disabled);
+		calculationMethod.setDisable(disabled);
+		parallelCalculationEnabled.setDisable(disabled);
+		tMax.setDisable(disabled);
+		tMin.setDisable(disabled);
+		tSteps.setDisable(disabled);
+		xMax.setDisable(disabled);
+		xMin.setDisable(disabled);
+		xSteps.setDisable(disabled);		
+	}
+
+	private void setBuildButtonsDisabled(boolean disabled) {
+		buildSolutionButton.setDisable(disabled);
+		//Maybe you should to add "abort" button so that 
+			//you will be able to stop the calculation without closing programm?
+	}
+
+	private void validateSteps(final int xSteps, final int tSteps) throws InvalidStepsException {
+		if (xSteps < 2) {
+//			alert(AlertType.ERROR, header, );
+			throw new InvalidStepsException("Invalid xSteps value", "The number of xSteps should be at least 2!");
+		}
+		if (tSteps < 2) {
+//			alert(AlertType.ERROR, header, "Invalid tSteps value",
+//					"The number of tSteps should be at least 2!");
+			throw new InvalidStepsException("Invalid tSteps value", "The number of tSteps should be at least 2!");
+		}
 	}
 
 	private Task<UniformGrid> buildPlotPointsTask(PlotCacheKey plotCacheKey, DiffeqCalculationMethod method) {
+		setBuildButtonsDisabled(true);
 		final int xSteps = plotCacheKey.getXSteps();
 		final int tSteps = plotCacheKey.getTSteps();
 		final Range xRange = plotCacheKey.getXRange();
@@ -199,6 +249,10 @@ public class MainController implements Initializable{
 		Task<UniformGrid> task = parallelCalculationEnabled.isSelected()
 				? method.getSolveDiffEquationConcurrentlyTask(xRange, tRange, xSteps, tSteps)
 				: method.getSolveDiffEquationTask(xRange, tRange, xSteps, tSteps);
+
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> onBuildTaskSucceed(e, plotCacheKey));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_CANCELLED, e-> setBuildButtonsDisabled(false));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_FAILED, e-> setBuildButtonsDisabled(false));
 		buildProgressIndicator.progressProperty().unbind();
 		buildProgressIndicator.progressProperty().bind(task.progressProperty());
 		return task;
@@ -206,26 +260,37 @@ public class MainController implements Initializable{
 
 	private void onBuildTaskSucceed(WorkerStateEvent e, PlotCacheKey plotCacheKey) {
 		log.info("Building task for {} completed successfully", plotCacheKey);
+		isBuildProcessRunning.set(false);
 		List<Coord3d> points = ((UniformGrid) e.getSource().getValue()).getGridNodePoints();
 		plotDataCache.remove(plotCacheKey);
 		plotDataCache.put(plotCacheKey, new SoftReference<>(points));
+		setBuildButtonsDisabled(false);
 	}
 
 	@FXML
 	private void showPreciseSolution(Event e) {
-		final Range xRange = mainParametersService.getXRange();
-		final int xSteps = mainParametersService.getXSteps();
-		final Range tRange = mainParametersService.getTRange();
-		final int tSteps = mainParametersService.getTSteps();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting precise solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
+		PlotCacheKey preciseSolutionPlotCacheKey;
+		try {
+			preciseSolutionPlotCacheKey = getPrecisePlotCacheKey();
+		} catch (InvalidStepsException ex) {
+			alert(AlertType.ERROR, "Presenting precise solution", ex.getExceptionHeader(), ex.getExceptionContent());
 			return;
 		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Presenting precise solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
-			return;
+		List<Coord3d> points = getOrCreatePrecisePointsCachingThemIfNecessary(preciseSolutionPlotCacheKey);
+		showPlotStage(points, "Precise solution");
+	}
+
+	private PlotCacheKey getPrecisePlotCacheKey() throws InvalidStepsException {
+		setParametersEditingDisabled(true);
+		final int xSteps = mainParametersService.getXSteps();
+		final int tSteps = mainParametersService.getTSteps();
+		final Range xRange = mainParametersService.getXRange();
+		final Range tRange = mainParametersService.getTRange();
+		try {
+			validateSteps(xSteps, tSteps);
+		} catch (InvalidStepsException e) {
+			setParametersEditingDisabled(false);
+			throw e;
 		}
 
 		PlotCacheKey key = new PlotCacheKey();
@@ -234,11 +299,13 @@ public class MainController implements Initializable{
 		key.setTSteps(tSteps);
 		key.setXRange(xRange);
 		key.setXSteps(xSteps);
-		List<Coord3d> points = createPrecisePlotPontsCachingThem(key);
-		showPlotStage(points, "Precise solution");
+		key.setParamA(preciseSolutionService.getA());
+		key.setParamB(preciseSolutionService.getB());
+		setParametersEditingDisabled(false);
+		return key;
 	}
 
-	private List<Coord3d> createPrecisePlotPontsCachingThem(PlotCacheKey key) {
+	private List<Coord3d> getOrCreatePrecisePointsCachingThemIfNecessary(PlotCacheKey key) {
 		final Range xRange = key.getXRange();
 		final int xSteps = key.getXSteps();
 		final Range tRange = key.getTRange();
@@ -257,60 +324,35 @@ public class MainController implements Initializable{
 		return points;
 	}
 
-	private static Parent loadRootNode(String fxmlFile, FXMLLoader loader) {
-		Parent rootNode = null;
-		try {
-			rootNode = loader.load(MainApp.class.getResourceAsStream(fxmlFile));
-		} catch (IOException ex) {
-			throw new RuntimeException(
-					String.format("Unable to load view from %s. Operation will be aborted.", fxmlFile));
-		}
-		return rootNode;
-	}
-
 	@FXML
 	private void showBuiltSolution(Event e) {
-		final int xSteps = mainParametersService.getXSteps();
-		final int tSteps = mainParametersService.getTSteps();
-		final Range xRange = mainParametersService.getXRange();
-		final Range tRange = mainParametersService.getTRange();
-		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting built solution", "Invalid xSteps value",
-					"The number of xSteps should be at least 2!");
+		Pair<PlotCacheKey, DiffeqCalculationMethod> keyAndMethod;
+		try {
+			keyAndMethod = getBuiltPlotCacheKeyAndCalculationMethod();
+		} catch (InvalidStepsException ex) {
+			alert(AlertType.ERROR, "Presenting built solution", ex.getExceptionHeader(), ex.getExceptionContent());
 			return;
 		}
-		if (tSteps < 2) {
-			alert(AlertType.ERROR, "Presenting built solution", "Invalid tSteps value",
-					"The number of tSteps should be at least 2!");
-			return;
-		}
+		final PlotCacheKey key = keyAndMethod.getFirst();
+		final DiffeqCalculationMethod method = keyAndMethod.getSecond();
 
-		PlotCacheKey key = new PlotCacheKey();
-		key.setCalculationType(method.getCalculationType());
-		key.setTRange(tRange);
-		key.setTSteps(tSteps);
-		key.setXRange(xRange);
-		key.setXSteps(xSteps);
 		SoftReference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
 		List<Coord3d> points = null;
 		if(plotPointsWeak == null || (points = plotPointsWeak.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache. Starting the build process", key);
-			buildPlotPointsAndThenShowPlot(key, method);
+			if (!isBuildProcessRunning.compareAndSet(false, true)) {
+				alert(AlertType.WARNING, "Building solution", "Unable to launch building task",
+						"There is another running building task");
+				return;
+			}
+			Task<UniformGrid> task = buildPlotPointsTask(key, method);
+			task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED,
+					e1-> showPlotStage(((UniformGrid) e1.getSource().getValue()).getGridNodePoints(), "Built solution"));
+			buildProgressIndicator.setVisible(true);
+			new Thread(task).start();
 		} else {
 			showPlotStage(points, "Build solution");
-		}
-	}
-
-
-	private void buildPlotPointsAndThenShowPlot(PlotCacheKey plotCacheKey, DiffeqCalculationMethod method) {
-		Task<UniformGrid> task = buildPlotPointsTask(plotCacheKey, method);
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> {
-			onBuildTaskSucceed(e, plotCacheKey);
-			showPlotStage(((UniformGrid) e.getSource().getValue()).getGridNodePoints(), "Built solution");
-		});
-		buildProgressIndicator.setVisible(true);
-		new Thread(task).start();
+		}		
 	}
 
 	private void showPlotStage(List<Coord3d> points, String title) {
@@ -337,41 +379,44 @@ public class MainController implements Initializable{
 			stage.show();
 		});
 		showProgressIndicator.setVisible(true);
-		new Thread(task).start();
+		Thread th = new Thread(task);
+		th.setDaemon(false);
+		th.start();
+	}
+	
+	
+	private static Parent loadRootNode(String fxmlFile, FXMLLoader loader) {
+		Parent rootNode = null;
+		try {
+			rootNode = loader.load(MainApp.class.getResourceAsStream(fxmlFile));
+		} catch (IOException ex) {
+			throw new RuntimeException(
+					String.format("Unable to load view from %s. Operation will be aborted.", fxmlFile));
+		}
+		return rootNode;
 	}
 	
 	@FXML
 	private void showDifference(Event e) {
-		final int xSteps = mainParametersService.getXSteps();
-		final int tSteps = mainParametersService.getTSteps();
-		final Range xRange = mainParametersService.getXRange();
-		final Range tRange = mainParametersService.getTRange();
-		DiffeqCalculationMethod method = calculationMethod.getValue();
-		if (xSteps < 2) {
-			alert(AlertType.ERROR, "Presenting difference between precise and built solutions", 
-					"Invalid xSteps value",	"The number of xSteps should be at least 2!");
-			return;
-		}
-		if (tSteps < 2) {
+		Pair<PlotCacheKey, DiffeqCalculationMethod> keyAndMethod;
+		try {
+			keyAndMethod = getBuiltPlotCacheKeyAndCalculationMethod();
+		} catch (InvalidStepsException ex) {
 			alert(AlertType.ERROR, "Presenting difference between precise and built solutions",
-					"Invalid tSteps value",	"The number of tSteps should be at least 2!");
+					ex.getExceptionHeader(), ex.getExceptionContent());
 			return;
 		}
-
-		PlotCacheKey key = new PlotCacheKey();
-		key.setCalculationType(method.getCalculationType());
-		key.setTRange(tRange);
-		key.setTSteps(tSteps);
-		key.setXRange(xRange);
-		key.setXSteps(xSteps);
+		final PlotCacheKey key = keyAndMethod.getFirst();
+		final DiffeqCalculationMethod method = keyAndMethod.getSecond();
 		key.setDifference(true);
+		
 		SoftReference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
 		List<Coord3d> points = null;
 		if(plotPointsWeak == null || (points = plotPointsWeak.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache. Starting the build process", key);
 			buildDifferencePlotPointsAndThenShowPlot(key, method);
 		} else {
-			showPlotStage(points, "Build solution");
+			showPlotStage(points, "Difference plot");
 		}
 		
 	}
@@ -394,11 +439,9 @@ public class MainController implements Initializable{
 	private void buildPlotPointsAndThenGetPrecisePoints(PlotCacheKey plotCacheKey,
 			DiffeqCalculationMethod method) {
 		Task<UniformGrid> task = buildPlotPointsTask(plotCacheKey, method);
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> {
-			onBuildTaskSucceed(e, plotCacheKey);
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> 
 			getPrecisePointsAndShowDifferencePlot(plotCacheKey, method,
-					((UniformGrid) e.getSource().getValue()).getGridNodePoints());
-		});
+					((UniformGrid) e.getSource().getValue()).getGridNodePoints()));
 		buildProgressIndicator.setVisible(true);
 		new Thread(task).start();
 	}
@@ -409,7 +452,7 @@ public class MainController implements Initializable{
 		PlotCacheKey precisePlotCacheKey = new PlotCacheKey(plotCacheKey);
 		precisePlotCacheKey.setCalculationType(CalculationType.PRECISE);
 		precisePlotCacheKey.setDifference(false);
-		List<Coord3d> precisePoints = createPrecisePlotPontsCachingThem(precisePlotCacheKey);
+		List<Coord3d> precisePoints = getOrCreatePrecisePointsCachingThemIfNecessary(precisePlotCacheKey);
 		if (precisePoints.size() != builtPoints.size()) {
 			alert(AlertType.ERROR, "Building difference plot", "Error making difference between points",
 					"It seems that built solution is incomplete. Dimensions of precise solution points list "
@@ -447,14 +490,12 @@ public class MainController implements Initializable{
 			List<Coord3d> points = ((List<Coord3d>) e.getSource().getValue());
 			plotDataCache.remove(differencePlotCacheKey);
 			plotDataCache.put(differencePlotCacheKey, new SoftReference<>(points));
-
 			showPlotStage(points, "Difference plot");
 		});
 		buildProgressIndicator.setVisible(true);
 		new Thread(task).start();
 		
 	}
-
 
 	private static void alert(AlertType alertType, String title, String header,
 			String content) {
