@@ -46,7 +46,9 @@ public class PlotController{
 		chartFactory = new JavaFXChartFactory();
 //		this.plotParametersService = plotParametersService;
 		isWireframeDisplayedProperty = plotParametersService.isWireframeDisplayedProperty();
+		System.out.println("Before making chart...");
 		chart = makeChart();
+		System.out.println("After making chart!");
 	}
 
 	private AWTChart makeChart() {

@@ -16,5 +16,6 @@ public class ExplicitPointResolver {
 				Math.pow(wRight-wLeft, 2)/6
 				+ wCenter * (wLeft - 2*wCenter + wRight)
 				);
+//		return Double.isNaN(wTop)? 0 : wTop;
 	}
 }

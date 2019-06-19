@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javafx.concurrent.Task;
+import ua.kpi.iasa.parallel.course.TaskFailedException;
 import ua.kpi.iasa.parallel.course.data.AbstractUniformGrid;
 import ua.kpi.iasa.parallel.course.data.GridValuePointer;
 import ua.kpi.iasa.parallel.course.data.UniformGrid;
@@ -32,12 +33,14 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 			@Override
 			protected UniformGrid call() throws Exception {
 				Date startDate = logBefore("explicitSequentialDiffeqSolutionStrategy");
-				long workDone = 0;
-				updateProgress(0, tSteps);
+				double dWork = 1./tSteps;
+				double work = 0;
+				updateMessage(BUILDING_PLOT_GRID_VALUES_MESSAGE + "...");
+				updateProgress(work, 1);
 				UniformGrid grid = new UniformGrid(xRange, tRange, xSteps, tSteps);
 				GridValuePointer gridPointer = makeGridPointerFilledWithInitialCondidions(grid);
-				workDone = 2;
-				updateProgress(workDone, tSteps);
+				work = 2*dWork;
+				updateProgress(work, 1);
 				final DoubleUnaryOperator leftEdgeCondition = 
 						conditionService.getLeftEdgeCondition();
 				final DoubleUnaryOperator rightEdgeCondition = 
@@ -47,7 +50,12 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 				final ExplicitPointResolver resolver = 
 						new ExplicitPointResolver(dt, dx, mainParametersService.getAlpha());
 
+				int iterPerUpdate = tSteps/100;
+				int iter = 0;
 				while(gridPointer.canMakePositiveTStep()) {
+					if (isCancelled()) {
+						return null;
+					}
 					gridPointer.makePositiveTStepResettingX();
 					gridPointer.makePositiveXStep();
 					gridPointer.setCurrentValueApplyingToT(leftEdgeCondition);
@@ -57,10 +65,26 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 						gridPointer.makePositiveXStep();
 					}
 					gridPointer.setCurrentValueApplyingToT(rightEdgeCondition);
-					updateProgress(++workDone, tSteps);
+					work += dWork;
+					if (iter++ == iterPerUpdate) {
+						iter = 0;
+						updateProgress(work, 1);
+					}
 				}
-				logAfter(startDate, grid);
+				logAfter(startDate, grid.getGridNodeValues());
+				checkBuildNodePointsAbility(grid);
+				updateProgress(1., 1.);
 				return grid;
+			}
+
+			private void checkBuildNodePointsAbility(UniformGrid grid) throws TaskFailedException {
+				updateProgress(-1., 1.);
+				updateMessage(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + "...");
+				if (grid.getXStepsCount() * grid.getTStepsCount() > PLOT_POINTS_LIST_MAX_SIZE) {
+					throw new TaskFailedException(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + " failed",
+							"There are too many plot points to gather them to list");
+				}
+				grid.buildNodePoints();
 			}
 
 		};

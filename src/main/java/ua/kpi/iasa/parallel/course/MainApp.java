@@ -17,6 +17,19 @@ public class MainApp extends Application {
 
 	public static void main(String[] args) throws Exception {
 		launch(args);
+//		double sigma = 1;
+//		double wBottom = 0.0;
+//		double wCenter = 0.0;
+//		double wRight, wLeft;
+//		wRight = wLeft = 0.01130342;
+//		final double centerPow = Math.pow(wCenter, -1./3);
+//		System.out.println("CenterPow: " + centerPow);
+//		final double sideDeltaPow = Math.pow(wRight-wLeft, 2);
+//		System.out.println("sideDeltaPow: " + sideDeltaPow);
+//		double result = wBottom + sigma * centerPow * (
+//				sideDeltaPow/6
+//				+ wCenter * (wLeft - 2*wCenter + wRight)
+//				);
 	}
 
 	public static AnnotationConfigApplicationContext context;
@@ -43,10 +56,10 @@ public class MainApp extends Application {
 		log.debug("Showing JFX scene");
 		Scene scene = new Scene(rootNode, 800, 600);
 //		scene.getStylesheets().add("/styles/styles.css");
-//		MainController mainController = loader.getController();
+		MainController mainController = loader.getController();
 		stage.setTitle("Parallel calculation coursework presentation");
 		stage.setScene(scene);
-		stage.setOnCloseRequest(e-> Platform.exit());
+		stage.setOnCloseRequest(e-> mainController.finishAllTasks());
 		stage.show();
 	}
 	
