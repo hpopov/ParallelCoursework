@@ -13,6 +13,10 @@ import ua.kpi.iasa.parallel.course.data.UniformGrid;
 public abstract class AbstractDiffeqSolutionStrategy implements DiffeqSolutionStrategy {
 
 	private static final Logger log = LoggerFactory.getLogger(AbstractDiffeqSolutionStrategy.class);
+
+	protected static final int PLOT_POINTS_LIST_MAX_SIZE = 50_000_000;
+	protected static final String BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE = "Building node points for plot";
+	protected static final String BUILDING_PLOT_GRID_VALUES_MESSAGE = "Building plot grid values";
 	
 	protected static Date logBefore(String taskName) {
 		Date date = new Date();
@@ -25,7 +29,7 @@ public abstract class AbstractDiffeqSolutionStrategy implements DiffeqSolutionSt
 		long millisDiff = currentDate.getTime() - beforeDate.getTime();
 		int millis = (int) (millisDiff % 1000);
 		int seconds = (int) ((millisDiff - millis)/1000);
-		log.info("Task finished. Task duration: {}s:{}ms", seconds, millis);
+		log.info("Building plot grid values for task completed. Duration: {}s:{}ms", seconds, millis);
 		String arrayPresentation = null;
 		if (gridNodeValues.length <= 10 && gridNodeValues[0].length <= 10) {
 			arrayPresentation = present2DArray(gridNodeValues);
@@ -54,7 +58,7 @@ public abstract class AbstractDiffeqSolutionStrategy implements DiffeqSolutionSt
 			}
 			arrayPresentation = present2DArray(arrayToPresent);
 		}
-		log.info("Task result:\n{}", arrayPresentation);
+		log.info("Demonstrative grid values:\n{}", arrayPresentation);
 	}
 
 	private static String present2DArray(double[][] arrayToPresent) {

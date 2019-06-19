@@ -1,7 +1,5 @@
 package ua.kpi.iasa.parallel.course.methods.tasks;
 
-import static org.junit.Assert.fail;
-
 import java.util.Date;
 import java.util.function.DoubleUnaryOperator;
 
@@ -35,18 +33,14 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 			@Override
 			protected UniformGrid call() throws Exception {
 				Date startDate = logBefore("explicitSequentialDiffeqSolutionStrategy");
-//				long workDone = 0;
 				double dWork = 1./tSteps;
 				double work = 0;
-//				updateProgress(0, tSteps);
-				updateMessage("Building plot grid values...");
-				updateProgress(work, 1.1);
+				updateMessage(BUILDING_PLOT_GRID_VALUES_MESSAGE + "...");
+				updateProgress(work, 1);
 				UniformGrid grid = new UniformGrid(xRange, tRange, xSteps, tSteps);
 				GridValuePointer gridPointer = makeGridPointerFilledWithInitialCondidions(grid);
-//				workDone = 2;
 				work = 2*dWork;
-//				updateProgress(workDone, tSteps);
-				updateProgress(work, 1.1);
+				updateProgress(work, 1);
 				final DoubleUnaryOperator leftEdgeCondition = 
 						conditionService.getLeftEdgeCondition();
 				final DoubleUnaryOperator rightEdgeCondition = 
@@ -74,20 +68,23 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 					work += dWork;
 					if (iter++ == iterPerUpdate) {
 						iter = 0;
-						updateProgress(work, 1.1);
+						updateProgress(work, 1);
 					}
-//					updateProgress(++workDone, tSteps);
-//					Thread.yield();
 				}
-//				updateProgress(tSteps, tSteps);
 				logAfter(startDate, grid.getGridNodeValues());
-				updateMessage("Building node points for plot...");
-				if (grid.getTStepsCount() * grid.getTStepsCount() > 50_000_000) {
-					throw new TaskFailedException("There are too many plot points to gather them to list");
+				checkBuildNodePointsAbility(grid);
+				updateProgress(1., 1.);
+				return grid;
+			}
+
+			private void checkBuildNodePointsAbility(UniformGrid grid) throws TaskFailedException {
+				updateProgress(-1., 1.);
+				updateMessage(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + "...");
+				if (grid.getXStepsCount() * grid.getTStepsCount() > PLOT_POINTS_LIST_MAX_SIZE) {
+					throw new TaskFailedException(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + " failed",
+							"There are too many plot points to gather them to list");
 				}
 				grid.buildNodePoints();
-				updateProgress(1.1, 1.1);
-				return grid;
 			}
 
 		};

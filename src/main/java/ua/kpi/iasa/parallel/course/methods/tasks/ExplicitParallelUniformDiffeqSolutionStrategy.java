@@ -8,12 +8,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.function.DoubleUnaryOperator;
+import java.util.function.Supplier;
 
 import org.jzy3d.maths.Range;
 import org.springframework.stereotype.Component;
 
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.concurrent.Task;
+import ua.kpi.iasa.parallel.course.TaskFailedException;
 import ua.kpi.iasa.parallel.course.data.AbstractUniformGrid;
 import ua.kpi.iasa.parallel.course.data.GridValuePointer;
 import ua.kpi.iasa.parallel.course.data.UniformGrid;
@@ -45,6 +47,7 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 			@Override
 			protected UniformGrid call() throws Exception {
 				Date startDate = logBefore("explicitParallelDiffeqSolutionStrategy");
+				updateMessage(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + "...");
 				UniformGrid grid = new UniformGrid(xRange, tRange, xSteps, tSteps);
 				ExecutorService executor = Executors.newFixedThreadPool(actualThreadCount);
 				Semaphore[] semaphores = new Semaphore[(actualThreadCount-2)*2 + 2];
@@ -54,6 +57,9 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 				int semInd = 0;
 				List<AbstractSubGridSolverRunnable> subGridSolvers = new ArrayList<>(actualThreadCount);
 				final int xStepsPerThread = xSteps/actualThreadCount;
+				if (isCancelled()) {
+					return null;
+				}
 
 				int currentThreadFromXIndex = 0;
 				subGridSolvers.add(new LeftSubGridSolverRunnable(grid.subXGrid(currentThreadFromXIndex, xStepsPerThread),
@@ -70,19 +76,42 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 						grid.subXGrid(currentThreadFromXIndex, xSteps - currentThreadFromXIndex),
 						semaphores[semInd], semaphores[semInd+1]);
 				runner.progressProperty().addListener((observable, oldV, newV)-> updateProgress(newV.doubleValue(), 1.));
+				runner.setIsCancelled(this::isCancelled);
+				if (isCancelled()) {
+					return null;
+				}
 				
 				subGridSolvers.stream().forEach(executor::execute);
 				runner.run();
+				if (isCancelled()) {
+					executor.shutdownNow();
+					return null;
+				}
+				updateMessage(BUILDING_PLOT_GRID_VALUES_MESSAGE + "...");
 				executor.shutdown();
-//				try {
-//					executor.awaitTermination(3, TimeUnit.SECONDS);
-//				} catch (InterruptedException e) {
-//					System.err.println("executor interrupts execution!");
-//				}
+				try {
+					executor.awaitTermination(2, TimeUnit.SECONDS);
+				} catch (InterruptedException e) {
+					System.err.println("executor interrupts execution!");
+				}
 				logAfter(startDate, grid.getGridNodeValues());
+				if (isCancelled()) {
+					return null;
+				}
+				checkBuildNodePointsAbility(grid);
+				updateProgress(1., 1.);
 				return grid;
 			}
 
+			private void checkBuildNodePointsAbility(UniformGrid grid) throws TaskFailedException {
+				updateProgress(-1., 1.);
+				updateMessage(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + "...");
+				if (grid.getXStepsCount() * grid.getTStepsCount() > PLOT_POINTS_LIST_MAX_SIZE) {
+					throw new TaskFailedException(BUILDING_NODE_POINTS_FOR_PLOT_MESSAGE + " failed",
+							"There are too many plot points to gather them to list");
+				}
+				grid.buildNodePoints();
+			}
 		};
 	}
 
@@ -216,16 +245,17 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 
 	private class RightSubGridSolverRunnable extends AbstractSubGridSolverRunnable {
 
-		private final Semaphore leftSemaphore;
-		private final Semaphore neighbourLeftSemaphore;
+//		private final Semaphore leftSemaphore;
+//		private final Semaphore neighbourLeftSemaphore;
 		private final DoubleUnaryOperator rightEdgeCondition;
 		private final Task<Void> innerTask;
+		private Supplier<Boolean> isCancelledSupplier;
 
-		public RightSubGridSolverRunnable(AbstractUniformGrid abstractUniformGrid, Semaphore neighbourLeftSemaphore,
-				Semaphore leftSemaphore) {
+		public RightSubGridSolverRunnable(final AbstractUniformGrid abstractUniformGrid,
+				final Semaphore neighbourLeftSemaphore, final Semaphore leftSemaphore) {
 			super(abstractUniformGrid);
-			this.leftSemaphore = leftSemaphore;
-			this.neighbourLeftSemaphore = neighbourLeftSemaphore;
+//			this.leftSemaphore = leftSemaphore;
+//			this.neighbourLeftSemaphore = neighbourLeftSemaphore;
 			this.rightEdgeCondition = conditionService.getRightEdgeCondition();
 			
 			innerTask = new Task<Void>() {
@@ -234,11 +264,17 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 				protected Void call() throws Exception {
 					long totalWork = grid.getTStepsCount();
 					updateProgress(0, totalWork);
+					final int iterCountPerPercent = (int) (totalWork/100);
 					final GridValuePointer gridPointer = makeGridPointerFilledWithInitialCondidions(grid);
-					
+					if (isOuterTaskCancelled()) {
+						return null;
+					}
 					long currentWork = 2;
 					updateProgress(currentWork, totalWork);
 					while(gridPointer.canMakePositiveTStep()) {
+						if (isOuterTaskCancelled()) {
+							return null;
+						}
 						gridPointer.makePositiveTStepResettingX();
 						gridPointer.makePositiveXStep();
 						acquireSemaphore(neighbourLeftSemaphore);
@@ -250,11 +286,16 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 							gridPointer.makePositiveXStep();
 						}
 						gridPointer.setCurrentValueApplyingToT(rightEdgeCondition);
-						updateProgress(++currentWork, totalWork);	
+						if (++currentWork % iterCountPerPercent == 0) {
+							updateProgress(currentWork, totalWork);	
+						}
 						if (!gridPointer.canMakePositiveTStep()) {
 							break;
 						}
 
+						if (isOuterTaskCancelled()) {
+							return null;
+						}
 						gridPointer.makePositiveTStep();
 						gridPointer.setCurrentValueApplyingToT(rightEdgeCondition);
 						gridPointer.makeNegativeXStep();
@@ -265,13 +306,23 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 						acquireSemaphore(neighbourLeftSemaphore);
 						gridPointer.setCurrentValue(calculateValue(gridPointer));
 						leftSemaphore.release();
-						updateProgress(++currentWork, totalWork);				
+						if (++currentWork % iterCountPerPercent == 0) {
+							updateProgress(currentWork, totalWork);	
+						}			
 					}
 					return null;
 				}
 				
 			};
 			
+		}
+
+		public void setIsCancelled(Supplier<Boolean> isCancelledSupplier) {
+			this.isCancelledSupplier = isCancelledSupplier;
+		}
+		
+		private boolean isOuterTaskCancelled() {
+			return isCancelledSupplier.get();
 		}
 
 		@Override

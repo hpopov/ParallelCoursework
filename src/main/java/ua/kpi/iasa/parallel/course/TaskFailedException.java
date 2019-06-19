@@ -7,4 +7,8 @@ public class TaskFailedException extends AlertableException {
 		super("Task execution failed", exceptionContent);
 	}
 
+	public TaskFailedException(String exceptionHeader, String exceptionContent) {
+		super(exceptionHeader, exceptionContent);
+	}
+
 }

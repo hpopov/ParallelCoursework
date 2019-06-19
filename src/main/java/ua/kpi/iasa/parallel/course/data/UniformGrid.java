@@ -102,10 +102,10 @@ public class UniformGrid extends AbstractUniformGrid {
 		}
 	}
 	
-//	public void clear() {
-//		this.nodePoints = null;
-//		this.nodeValues = null;
-//	}
+	public void clear() {
+		this.nodePoints = null;
+		this.nodeValues = null;
+	}
 	
 	private class UniformGridValuePointer extends AbstractValuePointer{
 		

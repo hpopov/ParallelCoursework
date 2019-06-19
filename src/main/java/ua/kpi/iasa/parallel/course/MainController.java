@@ -47,6 +47,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
@@ -90,6 +91,7 @@ public class MainController implements Initializable{
 
 	@FXML private Button buildSolutionButton;
 	@FXML private ProgressIndicator buildProgressIndicator;
+	@FXML private Label buildProgressLabel;
 	@FXML private Button showPreciseSolutionButton;
 	@FXML private Button showBuiltSolutionButton;
 	@FXML private Button showDifferenceButton;
@@ -121,11 +123,13 @@ public class MainController implements Initializable{
 
 	private final Map<PlotCacheKey, Reference<List<Coord3d>>> plotDataCache;
 	private final AtomicReference<Worker<?>> currentBuildProcessWorker;
+	private final AtomicReference<Thread> currentShowPlotThread;
 	private final List<Task<?>> runningTasks;
 
 	public MainController() {
 		plotDataCache = new HashMap<>();
 		currentBuildProcessWorker = new AtomicReference<>(null);
+		currentShowPlotThread = new AtomicReference<>(null);
 		runningTasks = new LinkedList<>();
 	}
 
@@ -239,8 +243,8 @@ public class MainController implements Initializable{
 
 	private void setBuildButtonsDisabled(boolean disabled) {
 		buildSolutionButton.setDisable(disabled);
-		//Maybe you should to add "abort" button so that 
-			//you will be able to stop the calculation without closing programm?
+
+		buildProgressLabel.setVisible(disabled);
 	}
 
 	private void validateSteps(final int xSteps, final int tSteps) throws InvalidStepsException {
@@ -279,8 +283,11 @@ public class MainController implements Initializable{
 				e-> onBuildTaskFailed(e, plotCacheKey));
 		buildProgressIndicator.progressProperty().unbind();
 		buildProgressIndicator.progressProperty().bind(task.progressProperty());
+		buildProgressLabel.textProperty().unbind();
+		buildProgressLabel.textProperty().bind(task.messageProperty());
 		
 		buildProgressIndicator.setVisible(true);
+		buildProgressLabel.setVisible(true);
 		abortBuildButton.setVisible(true);
 		runningTasks.add(task);
 		
@@ -292,13 +299,13 @@ public class MainController implements Initializable{
 		currentBuildProcessWorker.set(null);
 		final UniformGrid grid = (UniformGrid) e.getSource().getValue();
 		List<Coord3d> points = grid.getGridNodePoints();
-//		grid.clear();
+		grid.clear();
 		Reference<List<Coord3d>> ref = plotDataCache.remove(plotCacheKey);
 		if (ref != null) {
 			log.debug("Clearing cache reference...");
 			ref.clear();
 		}
-		plotDataCache.put(plotCacheKey, new SoftReference<>(points));
+		plotDataCache.put(plotCacheKey, new WeakReference<>(points));
 		setBuildButtonsDisabled(false);
 		abortBuildButton.setVisible(false);
 //		e.getSource().cancel();
@@ -324,9 +331,9 @@ public class MainController implements Initializable{
 			header = taskFailedException.getExceptionHeader();
 			content = taskFailedException.getExceptionContent();
 		}
-		log.info("Building task for {} failed\n. The reason: {}",
+		log.info("Building task for {} not completed\n. The reason: {}",
 				plotCacheKey, exception.getMessage());
-		alert(AlertType.INFORMATION, "Current build task failed", header, content);
+		alert(AlertType.INFORMATION, "Current build task were not completed", header, content);
 		currentBuildProcessWorker.set(null);
 		setBuildButtonsDisabled(false);
 		buildProgressIndicator.setVisible(false);
@@ -432,12 +439,21 @@ public class MainController implements Initializable{
 		Scene scene = new Scene(rootNode, 500, 530);
 		scene.getStylesheets().add("/styles/styles.css");
 
+		log.debug("Retrieving plotController...");
 		PlotController plotController = loader.getController();
-		log.debug("Making surface from points: {}", points);
+		log.debug("Making surface from points");
 		Task<Void> task = plotController
 				.makeAddSurfaceFromPointsTask(points);
+		Thread th = new Thread(task);
+		if (!currentShowPlotThread.compareAndSet(null, th)) {
+			alert(AlertType.ERROR, "Showing plot stage",
+					"Unable to make new surface-building thread",
+					"There are another surface-building thread running!");
+			return;
+		}
 		showProgressIndicator.progressProperty().bind(task.progressProperty());
 		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> {
+			currentShowPlotThread.set(null);
 			plotController.addSceneSizeChangedListener(scene);
 			plotController.initializeContent();
 			Stage stage = new Stage();
@@ -447,11 +463,9 @@ public class MainController implements Initializable{
 			stage.show();
 		});
 		showProgressIndicator.setVisible(true);
-		Thread th = new Thread(task);
-		th.setDaemon(false);
+		th.setDaemon(true);
 		th.start();
 	}
-	
 	
 	private static Parent loadRootNode(String fxmlFile, FXMLLoader loader) {
 		Parent rootNode = null;
@@ -579,5 +593,9 @@ public class MainController implements Initializable{
 		alert.setHeaderText(header);
 		alert.setContentText(content);
 		alert.showAndWait();
+	}
+
+	public void finishAllTasks() {
+		runningTasks.forEach(Task::cancel);
 	}
 }

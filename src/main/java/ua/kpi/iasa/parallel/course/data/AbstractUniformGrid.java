@@ -40,6 +40,12 @@ public abstract class AbstractUniformGrid implements Grid {
 	public abstract double getDx();
 	
 	public abstract double getDt();
+	
+	@Override
+	protected void finalize() throws Throwable {
+		System.out.println(this.getClass().getSimpleName() + hashCode() + "finalized!");
+		super.finalize();
+	}
 
 	protected abstract class AbstractValuePointer implements GridValuePointer{
 
@@ -149,5 +155,10 @@ public abstract class AbstractUniformGrid implements Grid {
 			return currentTInd > minTInd;
 		}
 
+		@Override
+		protected void finalize() throws Throwable {
+			System.out.println(this.getClass().getSimpleName() + hashCode() + "finalized!");
+			super.finalize();
+		}
 	}
 }
