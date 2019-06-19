@@ -20,14 +20,13 @@ public abstract class AbstractDiffeqSolutionStrategy implements DiffeqSolutionSt
 		return date;
 	}
 	
-	protected static void logAfter(Date beforeDate, UniformGrid grid) {
+	protected static void logAfter(Date beforeDate, final double[][] gridNodeValues) {
 		Date currentDate = new Date();
 		long millisDiff = currentDate.getTime() - beforeDate.getTime();
 		int millis = (int) (millisDiff % 1000);
 		int seconds = (int) ((millisDiff - millis)/1000);
 		log.info("Task finished. Task duration: {}s:{}ms", seconds, millis);
 		String arrayPresentation = null;
-		final double[][] gridNodeValues = grid.getGridNodeValues();
 		if (gridNodeValues.length <= 10 && gridNodeValues[0].length <= 10) {
 			arrayPresentation = present2DArray(gridNodeValues);
 		} else {

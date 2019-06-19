@@ -1,5 +1,7 @@
 package ua.kpi.iasa.parallel.course.methods.tasks;
 
+import static org.junit.Assert.fail;
+
 import java.util.Date;
 import java.util.function.DoubleUnaryOperator;
 
@@ -8,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javafx.concurrent.Task;
+import ua.kpi.iasa.parallel.course.TaskFailedException;
 import ua.kpi.iasa.parallel.course.data.AbstractUniformGrid;
 import ua.kpi.iasa.parallel.course.data.GridValuePointer;
 import ua.kpi.iasa.parallel.course.data.UniformGrid;
@@ -32,12 +35,18 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 			@Override
 			protected UniformGrid call() throws Exception {
 				Date startDate = logBefore("explicitSequentialDiffeqSolutionStrategy");
-				long workDone = 0;
-				updateProgress(0, tSteps);
+//				long workDone = 0;
+				double dWork = 1./tSteps;
+				double work = 0;
+//				updateProgress(0, tSteps);
+				updateMessage("Building plot grid values...");
+				updateProgress(work, 1.1);
 				UniformGrid grid = new UniformGrid(xRange, tRange, xSteps, tSteps);
 				GridValuePointer gridPointer = makeGridPointerFilledWithInitialCondidions(grid);
-				workDone = 2;
-				updateProgress(workDone, tSteps);
+//				workDone = 2;
+				work = 2*dWork;
+//				updateProgress(workDone, tSteps);
+				updateProgress(work, 1.1);
 				final DoubleUnaryOperator leftEdgeCondition = 
 						conditionService.getLeftEdgeCondition();
 				final DoubleUnaryOperator rightEdgeCondition = 
@@ -47,7 +56,12 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 				final ExplicitPointResolver resolver = 
 						new ExplicitPointResolver(dt, dx, mainParametersService.getAlpha());
 
+				int iterPerUpdate = tSteps/100;
+				int iter = 0;
 				while(gridPointer.canMakePositiveTStep()) {
+					if (isCancelled()) {
+						return null;
+					}
 					gridPointer.makePositiveTStepResettingX();
 					gridPointer.makePositiveXStep();
 					gridPointer.setCurrentValueApplyingToT(leftEdgeCondition);
@@ -57,9 +71,22 @@ public class ExplicitUniformDiffeqSolutionStrategy extends AbstractDiffeqSolutio
 						gridPointer.makePositiveXStep();
 					}
 					gridPointer.setCurrentValueApplyingToT(rightEdgeCondition);
-					updateProgress(++workDone, tSteps);
+					work += dWork;
+					if (iter++ == iterPerUpdate) {
+						iter = 0;
+						updateProgress(work, 1.1);
+					}
+//					updateProgress(++workDone, tSteps);
+//					Thread.yield();
 				}
-				logAfter(startDate, grid);
+//				updateProgress(tSteps, tSteps);
+				logAfter(startDate, grid.getGridNodeValues());
+				updateMessage("Building node points for plot...");
+				if (grid.getTStepsCount() * grid.getTStepsCount() > 50_000_000) {
+					throw new TaskFailedException("There are too many plot points to gather them to list");
+				}
+				grid.buildNodePoints();
+				updateProgress(1.1, 1.1);
 				return grid;
 			}
 

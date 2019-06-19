@@ -72,14 +72,14 @@ public class ExplicitParallelUniformDiffeqSolutionStrategy
 				runner.progressProperty().addListener((observable, oldV, newV)-> updateProgress(newV.doubleValue(), 1.));
 				
 				subGridSolvers.stream().forEach(executor::execute);
-				executor.shutdown();
 				runner.run();
-				try {
-					executor.awaitTermination(3, TimeUnit.SECONDS);
-				} catch (InterruptedException e) {
-					System.err.println("executor interrupts execution!");
-				}
-				logAfter(startDate, grid);
+				executor.shutdown();
+//				try {
+//					executor.awaitTermination(3, TimeUnit.SECONDS);
+//				} catch (InterruptedException e) {
+//					System.err.println("executor interrupts execution!");
+//				}
+				logAfter(startDate, grid.getGridNodeValues());
 				return grid;
 			}
 

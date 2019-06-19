@@ -53,6 +53,7 @@
 		</ComboBox>
 		<Button fx:id="buildSolutionButton" onAction="#buildSolution">Build</Button>
 		<ProgressIndicator fx:id="buildProgressIndicator" visible="false"></ProgressIndicator>
+		<Button fx:id="abortBuildButton" onAction="#abortBuildTask" visible="false">Cancel</Button>
 	</HBox>
 
 	<HBox alignment="CENTER">

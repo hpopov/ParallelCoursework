@@ -1,5 +1,7 @@
 package ua.kpi.iasa.parallel.course.data;
 
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.jzy3d.maths.Coord3d;
@@ -9,8 +11,8 @@ import ua.com.kl.cmathtutor.concurrency.NonBlockedConcurrentLinkedList;
 
 public class UniformGrid extends AbstractUniformGrid {
 
-	private final double[][] nodeValues;
-	private final List<Coord3d> nodePoints;
+	private /*final */double[][] nodeValues;
+	private /*final */List<Coord3d> nodePoints;
 	private final double dx;
 	private final double dt;
 	private boolean hasPointer = false;
@@ -18,7 +20,8 @@ public class UniformGrid extends AbstractUniformGrid {
 	public UniformGrid(Range xRange, Range tRange, int xStepsCount, int tStepsCount) {
 		super(xRange.getMin(), tRange.getMin(), xStepsCount, tStepsCount);
 		nodeValues = new double[tStepsCount][xStepsCount];
-		nodePoints = new NonBlockedConcurrentLinkedList<>();
+//		nodePoints = new NonBlockedConcurrentLinkedList<>();
+//		nodePoints = new LinkedList<>();
 		dx = xRange.getRange()/(xStepsCount-1);
 		dt = tRange.getRange()/(tStepsCount-1);
 	}
@@ -32,9 +35,9 @@ public class UniformGrid extends AbstractUniformGrid {
 		throw new IllegalStateException("Current grid has already had a pointer!");
 	}
 	
-	private void addNodePoint(Coord3d point) {
-		nodePoints.add(point);
-	}
+//	private void addNodePoint(Coord3d point) {
+//		nodePoints.add(point);
+//	}
 	
 	@Override
 	public double getDx() {
@@ -49,6 +52,10 @@ public class UniformGrid extends AbstractUniformGrid {
 	@Override
 	public List<Coord3d> getGridNodePoints() {
 //		return new ArrayList<>(nodePoints.values());
+//		if (nodePoints == null) {
+//			nodePoints = new ArrayList<>(getXStepsCount()*getTStepsCount());
+//			
+//		}
 		return nodePoints;
 	}
 
@@ -76,6 +83,29 @@ public class UniformGrid extends AbstractUniformGrid {
 		}
 		return new UniformSubGrid(fromXInd, 0, xStepsCount, getTStepsCount());
 	}
+
+	public void buildNodePoints() {
+		if (nodePoints == null) {
+			final int xStepsCount = getXStepsCount();
+			final int tStepsCount = getTStepsCount();
+			double t = minT;
+			double x = minX;
+			nodePoints = new ArrayList<>(xStepsCount*tStepsCount);
+			for(int i = 0; i<tStepsCount; i++) {
+				x = minX;
+				for(int j = 0; j<xStepsCount; j++) {
+					nodePoints.add(new Coord3d(x, t, nodeValues[i][j]));
+					x+=dx;
+				}
+				t += dt;
+			}
+		}
+	}
+	
+//	public void clear() {
+//		this.nodePoints = null;
+//		this.nodeValues = null;
+//	}
 	
 	private class UniformGridValuePointer extends AbstractValuePointer{
 		
@@ -96,11 +126,11 @@ public class UniformGrid extends AbstractUniformGrid {
 		@Override
 		public void setCurrentValue(double value) {
 			nodeValues[currentTInd][currentXInd] = value;
-			if (currentPoint == null) {
-				addNodePoint(currentPoint = new Coord3d(currentXCoord, currentTCoord, value));
-			} else {
-				currentPoint.z = (float) value;
-			}
+//			if (currentPoint == null) {
+//				addNodePoint(currentPoint = new Coord3d(currentXCoord, currentTCoord, value));
+//			} else {
+//				currentPoint.z = (float) value;
+//			}
 		}
 	}
 	
@@ -189,11 +219,11 @@ public class UniformGrid extends AbstractUniformGrid {
 			@Override
 			public void setCurrentValue(double value) {
 				nodeValues[currentTInd][currentXInd] = value;
-				if (currentPoint == null) {
-					addNodePoint(currentPoint = new Coord3d(currentXCoord, currentTCoord, value));
-				} else {
-					currentPoint.z = (float) value;
-				}
+//				if (currentPoint == null) {
+//					addNodePoint(currentPoint = new Coord3d(currentXCoord, currentTCoord, value));
+//				} else {
+//					currentPoint.z = (float) value;
+//				}
 			}
 			
 		}

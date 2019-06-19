@@ -2,6 +2,7 @@ package ua.kpi.iasa.parallel.course;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.net.URL;
@@ -9,11 +10,14 @@ import java.security.Key;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import org.jzy3d.maths.Coord3d;
@@ -30,6 +34,7 @@ import org.springframework.stereotype.Controller;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.concurrent.Task;
+import javafx.concurrent.Worker;
 import javafx.concurrent.WorkerStateEvent;
 import javafx.event.Event;
 import javafx.event.EventHandler;
@@ -54,6 +59,7 @@ import javafx.stage.WindowEvent;
 import javafx.util.Callback;
 import javafx.util.converter.NumberStringConverter;
 import ua.com.kl.cmathtutor.commons.Pair;
+import ua.com.kl.cmathtutor.concurrency.NonBlockedConcurrentLinkedList;
 import ua.kpi.iasa.parallel.course.data.Coord3dComparator;
 import ua.kpi.iasa.parallel.course.data.UniformGrid;
 import ua.kpi.iasa.parallel.course.data.cache.CalculationType;
@@ -88,6 +94,7 @@ public class MainController implements Initializable{
 	@FXML private Button showBuiltSolutionButton;
 	@FXML private Button showDifferenceButton;
 	@FXML private ProgressIndicator showProgressIndicator;
+	@FXML private Button abortBuildButton;
 
 	@FXML private CheckBox isWireframeDisplayed;
 
@@ -112,12 +119,14 @@ public class MainController implements Initializable{
 	@Qualifier("diffeqCalculationMethods")
 	private List<DiffeqCalculationMethod> diffeqCalculationMethods;
 
-	private final Map<PlotCacheKey, SoftReference<List<Coord3d>>> plotDataCache;
-	private final AtomicBoolean isBuildProcessRunning;
+	private final Map<PlotCacheKey, Reference<List<Coord3d>>> plotDataCache;
+	private final AtomicReference<Worker<?>> currentBuildProcessWorker;
+	private final List<Task<?>> runningTasks;
 
 	public MainController() {
 		plotDataCache = new HashMap<>();
-		isBuildProcessRunning = new AtomicBoolean(false);
+		currentBuildProcessWorker = new AtomicReference<>(null);
+		runningTasks = new LinkedList<>();
 	}
 
 	@Override
@@ -172,14 +181,20 @@ public class MainController implements Initializable{
 			alert(AlertType.ERROR, "Building solution", e.getExceptionHeader(), e.getExceptionContent());
 			return;
 		}
-		if (!isBuildProcessRunning.compareAndSet(false, true)) {
-			alert(AlertType.WARNING, "Building solution", "Unable to launch building task",
-					"There is another running building task");
+		Task<UniformGrid> task;
+		try {
+			task = buildPlotPointsTask(keyAndMethod.getFirst(), keyAndMethod.getSecond());
+		} catch (UnsuccessfulTaskBuildException e) {
+			alert(AlertType.WARNING, "Building solution", e.getExceptionHeader(), e.getExceptionContent());
 			return;
 		}
-		Task<UniformGrid> task = buildPlotPointsTask(keyAndMethod.getFirst(), keyAndMethod.getSecond());
-		buildProgressIndicator.setVisible(true);
 		new Thread(task).start();
+	}
+	
+	@FXML
+	private void abortBuildTask(Event event) {
+		Optional.ofNullable(currentBuildProcessWorker.get())
+			.ifPresent(Worker::cancel);
 	}
 	
 	private Pair<PlotCacheKey, DiffeqCalculationMethod> getBuiltPlotCacheKeyAndCalculationMethod()
@@ -230,41 +245,93 @@ public class MainController implements Initializable{
 
 	private void validateSteps(final int xSteps, final int tSteps) throws InvalidStepsException {
 		if (xSteps < 2) {
-//			alert(AlertType.ERROR, header, );
 			throw new InvalidStepsException("Invalid xSteps value", "The number of xSteps should be at least 2!");
 		}
 		if (tSteps < 2) {
-//			alert(AlertType.ERROR, header, "Invalid tSteps value",
-//					"The number of tSteps should be at least 2!");
 			throw new InvalidStepsException("Invalid tSteps value", "The number of tSteps should be at least 2!");
 		}
 	}
 
-	private Task<UniformGrid> buildPlotPointsTask(PlotCacheKey plotCacheKey, DiffeqCalculationMethod method) {
+	private Task<UniformGrid> buildPlotPointsTask(PlotCacheKey plotCacheKey, DiffeqCalculationMethod method)
+			throws UnsuccessfulTaskBuildException {
 		setBuildButtonsDisabled(true);
 		final int xSteps = plotCacheKey.getXSteps();
 		final int tSteps = plotCacheKey.getTSteps();
 		final Range xRange = plotCacheKey.getXRange();
 		final Range tRange = plotCacheKey.getTRange();
+		if (currentBuildProcessWorker.get() != null) {
+			throw new UnsuccessfulTaskBuildException("Unable to make building task",
+					"There is another running building task");
+		}
 		Task<UniformGrid> task = parallelCalculationEnabled.isSelected()
 				? method.getSolveDiffEquationConcurrentlyTask(xRange, tRange, xSteps, tSteps)
 				: method.getSolveDiffEquationTask(xRange, tRange, xSteps, tSteps);
 
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> onBuildTaskSucceed(e, plotCacheKey));
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_CANCELLED, e-> setBuildButtonsDisabled(false));
-		task.addEventHandler(WorkerStateEvent.WORKER_STATE_FAILED, e-> setBuildButtonsDisabled(false));
+		if (!currentBuildProcessWorker.compareAndSet(null, task)) {
+			throw new UnsuccessfulTaskBuildException("Unable to launch building task",
+					"There is another running building task");
+		}
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, 
+				e-> onBuildTaskSucceed(e, plotCacheKey));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_CANCELLED, 
+				e-> onBuildTaskCancelled(e, plotCacheKey));
+		task.addEventHandler(WorkerStateEvent.WORKER_STATE_FAILED,
+				e-> onBuildTaskFailed(e, plotCacheKey));
 		buildProgressIndicator.progressProperty().unbind();
 		buildProgressIndicator.progressProperty().bind(task.progressProperty());
+		
+		buildProgressIndicator.setVisible(true);
+		abortBuildButton.setVisible(true);
+		runningTasks.add(task);
+		
 		return task;
 	}
 
 	private void onBuildTaskSucceed(WorkerStateEvent e, PlotCacheKey plotCacheKey) {
 		log.info("Building task for {} completed successfully", plotCacheKey);
-		isBuildProcessRunning.set(false);
-		List<Coord3d> points = ((UniformGrid) e.getSource().getValue()).getGridNodePoints();
-		plotDataCache.remove(plotCacheKey);
+		currentBuildProcessWorker.set(null);
+		final UniformGrid grid = (UniformGrid) e.getSource().getValue();
+		List<Coord3d> points = grid.getGridNodePoints();
+//		grid.clear();
+		Reference<List<Coord3d>> ref = plotDataCache.remove(plotCacheKey);
+		if (ref != null) {
+			log.debug("Clearing cache reference...");
+			ref.clear();
+		}
 		plotDataCache.put(plotCacheKey, new SoftReference<>(points));
 		setBuildButtonsDisabled(false);
+		abortBuildButton.setVisible(false);
+//		e.getSource().cancel();
+		runningTasks.remove(e.getSource());
+	}
+	
+	private void onBuildTaskCancelled(WorkerStateEvent e, PlotCacheKey plotCacheKey) {
+		log.info("Building task for {} was cancelled", plotCacheKey);
+		currentBuildProcessWorker.set(null);
+		setBuildButtonsDisabled(false);
+		buildProgressIndicator.setVisible(false);
+		abortBuildButton.setVisible(false);
+		runningTasks.remove(e.getSource());
+	}
+	
+	private void onBuildTaskFailed(WorkerStateEvent e, PlotCacheKey plotCacheKey) {
+		final Worker worker = e.getSource();
+		final Throwable exception = worker.getException();
+		String header = "Unable to complete stage";
+		String content =  worker.getMessage();
+		if (exception instanceof TaskFailedException) {
+			TaskFailedException taskFailedException = (TaskFailedException) exception;
+			header = taskFailedException.getExceptionHeader();
+			content = taskFailedException.getExceptionContent();
+		}
+		log.info("Building task for {} failed\n. The reason: {}",
+				plotCacheKey, exception.getMessage());
+		alert(AlertType.INFORMATION, "Current build task failed", header, content);
+		currentBuildProcessWorker.set(null);
+		setBuildButtonsDisabled(false);
+		buildProgressIndicator.setVisible(false);
+		abortBuildButton.setVisible(false);
+		runningTasks.remove(worker);
 	}
 
 	@FXML
@@ -310,7 +377,7 @@ public class MainController implements Initializable{
 		final int xSteps = key.getXSteps();
 		final Range tRange = key.getTRange();
 		final int tSteps = key.getTSteps();
-		SoftReference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
+		Reference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
 		List<Coord3d> points = null;
 		if(plotPointsWeak == null || (points = plotPointsWeak.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache."
@@ -336,19 +403,20 @@ public class MainController implements Initializable{
 		final PlotCacheKey key = keyAndMethod.getFirst();
 		final DiffeqCalculationMethod method = keyAndMethod.getSecond();
 
-		SoftReference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
+		Reference<List<Coord3d>> plotPointsRef = plotDataCache.get(key);
 		List<Coord3d> points = null;
-		if(plotPointsWeak == null || (points = plotPointsWeak.get()) == null) {
+		if(plotPointsRef == null || (points = plotPointsRef.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache. Starting the build process", key);
-			if (!isBuildProcessRunning.compareAndSet(false, true)) {
-				alert(AlertType.WARNING, "Building solution", "Unable to launch building task",
-						"There is another running building task");
+			Task<UniformGrid> task;
+			try {
+				task = buildPlotPointsTask(key, method);
+			} catch (UnsuccessfulTaskBuildException ex) {
+				alert(AlertType.WARNING, "Building solution", ex.getExceptionHeader(), ex.getExceptionContent());
 				return;
 			}
-			Task<UniformGrid> task = buildPlotPointsTask(key, method);
 			task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED,
-					e1-> showPlotStage(((UniformGrid) e1.getSource().getValue()).getGridNodePoints(), "Built solution"));
-			buildProgressIndicator.setVisible(true);
+					e1-> showPlotStage(plotDataCache.get(key).get(), "Built solution"));
+//			buildProgressIndicator.setVisible(true);
 			new Thread(task).start();
 		} else {
 			showPlotStage(points, "Build solution");
@@ -365,7 +433,7 @@ public class MainController implements Initializable{
 		scene.getStylesheets().add("/styles/styles.css");
 
 		PlotController plotController = loader.getController();
-		
+		log.debug("Making surface from points: {}", points);
 		Task<Void> task = plotController
 				.makeAddSurfaceFromPointsTask(points);
 		showProgressIndicator.progressProperty().bind(task.progressProperty());
@@ -410,7 +478,7 @@ public class MainController implements Initializable{
 		final DiffeqCalculationMethod method = keyAndMethod.getSecond();
 		key.setDifference(true);
 		
-		SoftReference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
+		Reference<List<Coord3d>> plotPointsWeak = plotDataCache.get(key);
 		List<Coord3d> points = null;
 		if(plotPointsWeak == null || (points = plotPointsWeak.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache. Starting the build process", key);
@@ -425,7 +493,7 @@ public class MainController implements Initializable{
 			DiffeqCalculationMethod method) {
 		PlotCacheKey builtPlotCacheKey = new PlotCacheKey(plotCacheKey);
 		builtPlotCacheKey.setDifference(false);
-		SoftReference<List<Coord3d>> builtPlotPointsWeak = plotDataCache.get(builtPlotCacheKey);
+		Reference<List<Coord3d>> builtPlotPointsWeak = plotDataCache.get(builtPlotCacheKey);
 		List<Coord3d> points = null;
 		if(builtPlotPointsWeak == null || (points = builtPlotPointsWeak.get()) == null) {
 			log.warn("Points for a plot with parameters {} are absent in cache. Starting the build process",
@@ -438,11 +506,16 @@ public class MainController implements Initializable{
 	
 	private void buildPlotPointsAndThenGetPrecisePoints(PlotCacheKey plotCacheKey,
 			DiffeqCalculationMethod method) {
-		Task<UniformGrid> task = buildPlotPointsTask(plotCacheKey, method);
+		Task<UniformGrid> task;
+		try {
+			task = buildPlotPointsTask(plotCacheKey, method);
+		} catch (UnsuccessfulTaskBuildException ex) {
+			alert(AlertType.WARNING, "Building solution", ex.getExceptionHeader(), ex.getExceptionContent());
+			return;
+		}
 		task.addEventHandler(WorkerStateEvent.WORKER_STATE_SUCCEEDED, e-> 
-			getPrecisePointsAndShowDifferencePlot(plotCacheKey, method,
-					((UniformGrid) e.getSource().getValue()).getGridNodePoints()));
-		buildProgressIndicator.setVisible(true);
+			getPrecisePointsAndShowDifferencePlot(plotCacheKey, method, plotDataCache.get(plotCacheKey).get()));
+//		buildProgressIndicator.setVisible(true);
 		new Thread(task).start();
 	}
 	
@@ -499,6 +572,8 @@ public class MainController implements Initializable{
 
 	private static void alert(AlertType alertType, String title, String header,
 			String content) {
+		log.debug("Showing alert of type {}, title: {}, header: {}, content: {} ",
+				alertType, title, header, content);
 		Alert alert = new Alert(alertType);
 		alert.setTitle(title);
 		alert.setHeaderText(header);
